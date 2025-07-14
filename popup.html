@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>B站健身视频标题生成器</title>
+    <link rel="stylesheet" href="css/popup.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">B站健身视频标题生成器</h1>
+        <div class="form-group">
+            <label>选择日期</label>
+            <div class="date-picker-container">
+                <input type="text" class="date-picker-input" readonly>
+                <div class="date-picker-calendar">
+                    <div class="calendar-header">
+                        <div class="calendar-nav">
+                            <button class="prev-month">&lt;</button>
+                            <div class="calendar-title"></div>
+                            <button class="next-month">&gt;</button>
+                        </div>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <div>日</div>
+                        <div>一</div>
+                        <div>二</div>
+                        <div>三</div>
+                        <div>四</div>
+                        <div>五</div>
+                        <div>六</div>
+                    </div>
+                    <div class="calendar-days"></div>
+                </div>
+            </div>
+            <div class="shortcut-buttons">
+                <button class="shortcut-button" data-days="0">今天</button>
+                <button class="shortcut-button" data-days="-1">昨天</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>选择博主</label>
+            <select id="trainer">
+                <option value="祖嘉泽">祖嘉泽</option>
+                <option value="陈玉轩">陈玉轩</option>
+            </select>
+        </div>
+        <div class="form-group" id="timeGroup">
+            <label>时间段</label>
+            <select id="time">
+                <option value="早间">早间</option>
+                <option value="晚间">晚间</option>
+            </select>
+        </div>
+        <button id="generate">生成标题</button>
+        <div id="result"></div>
+    </div>
+    <div class="success-message">已复制到剪贴板</div>
+    <script src="popup.js"></script>
+</body>
+</html> 
