@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 添加博主选择事件监听
     trainerSelect.addEventListener('change', function() {
-        if (this.value === '陈玉轩') {
+        if (this.value === '陈玉轩' || this.value === '张峰') {
             timeSelect.value = '晚间';
             timeGroup.style.display = 'none';
         } else {
@@ -152,16 +152,26 @@ document.addEventListener('DOMContentLoaded', function() {
                date1.getDate() === date2.getDate();
     }
 
-    // 获取训练类型
-    function getTrainingType(weekDay) {
-        const trainingTypes = {
-            1: '臀腿塑形',
-            2: '复合训练',
-            3: '肩背塑形',
-            4: '复合训练',
-            5: '腰腹塑形'
+    // 获取训练类型 - 优化为支持多博主的通用函数
+    function getTrainingType(trainer, weekDay) {
+        // 训练类型映射表 - 使用对象字面量替代分散的条件判断
+        const trainingMaps = {
+            '陈玉轩': {
+                1: '臀腿塑形',
+                2: '复合训练',
+                3: '肩背塑形',
+                4: '复合训练',
+                5: '腰腹塑形'
+            },
+            '张峰': {
+                1: '臀腿肌力',
+                2: '手臂训练',
+                3: '肩背肌力',
+                4: '核心肌力',
+                5: '有氧双冠'
+            }
         };
-        return trainingTypes[weekDay] || '';
+        return trainingMaps[trainer]?.[weekDay] || '';
     }
 
     // 生成标题
@@ -179,8 +189,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (trainer === '祖嘉泽') {
             title = `「${dateStr}｜${time}」祖嘉泽有氧健身 直播回放录屏完整版`;
+        } else if (trainer === '张峰') {
+            const trainingType = getTrainingType(trainer, weekDay);
+            title = `「${dateStr}｜${trainingType}」张峰-Give Me Five 直播回放录屏完整版`;
         } else {
-            const trainingType = getTrainingType(weekDay);
+            const trainingType = getTrainingType(trainer, weekDay);
             title = `「${dateStr}｜晚间｜${trainingType}」陈玉轩-轩誓肌动 直播回放录屏完整版`;
         }
 
@@ -215,4 +228,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初始化日历
     initCalendar();
-}); 
+});
