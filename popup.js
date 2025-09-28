@@ -9,25 +9,84 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultDiv = document.getElementById('result');
     const successMessage = document.querySelector('.success-message');
     const shortcutButtons = document.querySelectorAll('.shortcut-button');
-    const trainerSelect = document.getElementById('trainer');
-    const timeSelect = document.getElementById('time');
+    const trainerButtons = document.querySelectorAll('.trainer-button');
+    const aerobicButtons = document.querySelectorAll('.aerobic-button');
+    const timeButtons = document.querySelectorAll('.time-button');
     const timeGroup = document.getElementById('timeGroup');
+    const aerobicGroup = document.getElementById('aerobicGroup');
 
     let currentDate = new Date();
     let selectedDate = null;
 
+    let selectedTrainer = '祖嘉泽';
+    let selectedAerobic = '沉浸有氧';
+    let selectedTime = '晚间';
+
     // 添加博主选择事件监听
-    trainerSelect.addEventListener('change', function() {
-        if (this.value === '陈玉轩' || this.value === '张峰') {
-            timeSelect.value = '晚间';
-            timeGroup.style.display = 'none';
-        } else {
-            timeGroup.style.display = 'block';
-        }
+    trainerButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // 移除其他按钮的激活状态
+            trainerButtons.forEach(btn => btn.classList.remove('active'));
+            // 激活当前按钮
+            this.classList.add('active');
+            selectedTrainer = this.dataset.trainer;
+
+            // 根据选择的博主显示/隐藏时间段选择
+            if (selectedTrainer === '陈玉轩' || selectedTrainer === '张峰') {
+                selectedTime = '晚间';
+                timeGroup.classList.add('hidden');
+            } else {
+                timeGroup.classList.remove('hidden');
+            }
+
+            // 处理张峰周五的特殊情况
+            updateAerobicGroup();
+        });
     });
 
-    // 初始触发一次trainer选择事件
-    trainerSelect.dispatchEvent(new Event('change'));
+    // 添加有氧类型选择事件监听
+    aerobicButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // 移除其他按钮的激活状态
+            aerobicButtons.forEach(btn => btn.classList.remove('active'));
+            // 激活当前按钮
+            this.classList.add('active');
+            selectedAerobic = this.dataset.aerobic;
+        });
+    });
+
+    // 添加时间段选择事件监听
+    timeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // 移除其他按钮的激活状态
+            timeButtons.forEach(btn => btn.classList.remove('active'));
+            // 激活当前按钮
+            this.classList.add('active');
+            selectedTime = this.dataset.time;
+        });
+    });
+
+    // 更新有氧选择组的显示状态
+    function updateAerobicGroup() {
+        if (selectedTrainer === '张峰' && selectedDate && selectedDate.getDay() === 5) {
+            aerobicGroup.classList.remove('hidden');
+        } else {
+            aerobicGroup.classList.add('hidden');
+        }
+    }
+
+    // 初始化trainer状态
+    function updateTrainerUI() {
+        if (selectedTrainer === '陈玉轩' || selectedTrainer === '张峰') {
+            selectedTime = '晚间';
+            timeGroup.classList.add('hidden');
+        } else {
+            timeGroup.classList.remove('hidden');
+        }
+        updateAerobicGroup();
+    }
+
+    updateTrainerUI();
 
     // 初始化日历
     function initCalendar() {
@@ -101,14 +160,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectedDate = currentDateObj;
                 dateInput.value = formatDate(selectedDate);
                 calendar.classList.remove('calendar-show');
-                
+
                 // 移除其他日期的选中状态
                 document.querySelectorAll('.calendar-day.selected').forEach(el => {
                     el.classList.remove('selected');
                 });
-                
+
                 // 添加当前日期的选中状态
                 dayElement.classList.add('selected');
+
+                // 更新有氧选择组显示状态
+                updateAerobicGroup();
             });
 
             calendarDays.appendChild(dayElement);
@@ -130,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         const weekDay = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
-        const trainer = trainerSelect.value;
+        const trainer = selectedTrainer;
         // 根据不同博主使用不同的日期格式
         if (trainer === '祖嘉泽') {
             return `${year}/${month}/${day} 周${weekDay}`;
@@ -181,8 +243,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const trainer = trainerSelect.value;
-        const time = timeSelect.value;
+        const trainer = selectedTrainer;
+        const time = selectedTime;
         const weekDay = selectedDate.getDay();
         const dateStr = formatDate(selectedDate);
         let title = '';
@@ -190,7 +252,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (trainer === '祖嘉泽') {
             title = `「${dateStr}｜${time}」祖嘉泽有氧健身 直播回放录屏完整版`;
         } else if (trainer === '张峰') {
-            const trainingType = getTrainingType(trainer, weekDay);
+            let trainingType = getTrainingType(trainer, weekDay);
+            // 如果是周五，使用用户选择的有氧类型
+            if (weekDay === 5) {
+                trainingType = selectedAerobic;
+            }
             title = `「${dateStr}｜${trainingType}」张峰-Give Me Five 直播回放录屏完整版`;
         } else {
             const trainingType = getTrainingType(trainer, weekDay);
@@ -223,6 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dateInput.value = formatDate(selectedDate);
             currentDate = new Date(selectedDate);
             renderCalendar();
+            updateAerobicGroup();
         });
     });
 

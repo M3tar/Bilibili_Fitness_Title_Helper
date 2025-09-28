@@ -183,16 +183,14 @@ button:active {
 }
 
 .calendar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     margin-bottom: 12px;
 }
 
 .calendar-nav {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
+    width: 100%;
 }
 
 .calendar-nav button {
@@ -273,4 +271,120 @@ button:active {
 
 .calendar-day.other-month {
     color: #999;
+}
+
+/* 博主选择按钮样式 */
+.trainer-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.trainer-button {
+    flex: 1;
+    padding: 10px 12px;
+    background-color: #f6f7f8;
+    border: 1px solid #e3e5e7;
+    border-radius: 8px;
+    color: #18191c;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trainer-button:hover {
+    border-color: #00a1d6;
+    color: #00a1d6;
+    background-color: #f0f7fa;
+    transform: translateY(-1px);
+}
+
+.trainer-button.active {
+    background-color: #00a1d6;
+    color: white;
+    border-color: #00a1d6;
+}
+
+.trainer-button.active:hover {
+    background-color: #00b5e5;
+    border-color: #00b5e5;
+}
+
+/* 时间段选择按钮样式 */
+.time-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.time-button {
+    flex: 1;
+    padding: 10px 12px;
+    background-color: #f6f7f8;
+    border: 1px solid #e3e5e7;
+    border-radius: 8px;
+    color: #18191c;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.time-button:hover {
+    border-color: #00a1d6;
+    color: #00a1d6;
+    background-color: #f0f7fa;
+    transform: translateY(-1px);
+}
+
+.time-button.active {
+    background-color: #00a1d6;
+    color: white;
+    border-color: #00a1d6;
+}
+
+.time-button.active:hover {
+    background-color: #00b5e5;
+    border-color: #00b5e5;
+}
+
+/* 有氧类型选择按钮样式 */
+.aerobic-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.aerobic-button {
+    flex: 1;
+    padding: 10px 12px;
+    background-color: #f6f7f8;
+    border: 1px solid #e3e5e7;
+    border-radius: 8px;
+    color: #18191c;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.aerobic-button:hover {
+    border-color: #00a1d6;
+    color: #00a1d6;
+    background-color: #f0f7fa;
+    transform: translateY(-1px);
+}
+
+.aerobic-button.active {
+    background-color: #00a1d6;
+    color: white;
+    border-color: #00a1d6;
+}
+
+.aerobic-button.active:hover {
+    background-color: #00b5e5;
+    border-color: #00b5e5;
+}
+
+/* 隐藏样式类 */
+.hidden {
+    display: none !important;
 } 

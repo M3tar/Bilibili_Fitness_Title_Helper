@@ -39,18 +39,25 @@
         </div>
         <div class="form-group">
             <label>选择博主</label>
-            <select id="trainer">
-                <option value="祖嘉泽">祖嘉泽</option>
-                <option value="陈玉轩">陈玉轩</option>
-                <option value="张峰">张峰</option>
-            </select>
+            <div class="trainer-buttons">
+                <button type="button" class="trainer-button active" data-trainer="祖嘉泽">祖嘉泽</button>
+                <button type="button" class="trainer-button" data-trainer="陈玉轩">陈玉轩</button>
+                <button type="button" class="trainer-button" data-trainer="张峰">张峰</button>
+            </div>
         </div>
         <div class="form-group" id="timeGroup">
             <label>时间段</label>
-            <select id="time">
-                <option value="早间">早间</option>
-                <option value="晚间">晚间</option>
-            </select>
+            <div class="time-buttons">
+                <button type="button" class="time-button" data-time="早间">早间</button>
+                <button type="button" class="time-button active" data-time="晚间">晚间</button>
+            </div>
+        </div>
+        <div class="form-group hidden" id="aerobicGroup">
+            <label>有氧类型</label>
+            <div class="aerobic-buttons">
+                <button type="button" class="aerobic-button" data-aerobic="有氧双冠">有氧双冠</button>
+                <button type="button" class="aerobic-button active" data-aerobic="沉浸有氧">沉浸有氧</button>
+            </div>
         </div>
         <button id="generate">生成标题</button>
         <div id="result"></div>
