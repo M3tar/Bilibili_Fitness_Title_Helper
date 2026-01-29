@@ -9,7 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultDiv = document.getElementById('result');
     const successMessage = document.querySelector('.success-message');
     const shortcutButtons = document.querySelectorAll('.shortcut-button');
-    const trainerButtons = document.querySelectorAll('.trainer-button');
+    const trainerButtonsContainer = document.getElementById('trainerButtons');
+    let trainerButtons = [];
+    const showChenToggle = document.getElementById('showChenToggle');
     const aerobicButtons = document.querySelectorAll('.aerobic-button');
     const timeButtons = document.querySelectorAll('.time-button');
     const timeGroup = document.getElementById('timeGroup');
@@ -18,18 +20,49 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentDate = new Date();
     let selectedDate = null;
 
+    let showChen = false;
+
     let selectedTrainer = '祖嘉泽';
     let selectedAerobic = '手臂核心';
     let selectedTime = '晚间';
 
+    function getTrainers() {
+        return [
+            { name: '祖嘉泽', enabled: true },
+            { name: '陈玉轩', enabled: showChen },
+            { name: '张峰', enabled: true }
+        ];
+    }
+
+    function renderTrainerButtons() {
+        trainerButtonsContainer.innerHTML = '';
+        const trainers = getTrainers().filter(trainer => trainer.enabled);
+        if (!trainers.some(trainer => trainer.name === selectedTrainer)) {
+            selectedTrainer = trainers[0]?.name || selectedTrainer;
+        }
+        trainers.forEach((trainer) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'trainer-button';
+            button.dataset.trainer = trainer.name;
+            button.textContent = trainer.name;
+            if (trainer.name === selectedTrainer) {
+                button.classList.add('active');
+            }
+            trainerButtonsContainer.appendChild(button);
+        });
+        trainerButtons = trainerButtonsContainer.querySelectorAll('.trainer-button');
+    }
+
     // 添加博主选择事件监听
-    trainerButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            // 移除其他按钮的激活状态
-            trainerButtons.forEach(btn => btn.classList.remove('active'));
-            // 激活当前按钮
-            this.classList.add('active');
-            selectedTrainer = this.dataset.trainer;
+    function bindTrainerButtonEvents() {
+        trainerButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // 移除其他按钮的激活状态
+                trainerButtons.forEach(btn => btn.classList.remove('active'));
+                // 激活当前按钮
+                this.classList.add('active');
+                selectedTrainer = this.dataset.trainer;
 
             // 根据选择的博主显示/隐藏时间段选择
             if (selectedTrainer === '陈玉轩' || selectedTrainer === '张峰') {
@@ -41,8 +74,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 处理张峰周五的特殊情况
             updateAerobicGroup();
+            });
         });
-    });
+    }
 
     // 添加有氧类型选择事件监听
     aerobicButtons.forEach(button => {
@@ -86,7 +120,57 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAerobicGroup();
     }
 
-    updateTrainerUI();
+    function saveShowChenPreference(value) {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ showChen: value });
+        } else {
+            try {
+                localStorage.setItem('showChen', value ? '1' : '0');
+            } catch (error) {
+                // Ignore storage failures.
+            }
+        }
+    }
+
+    function loadShowChenPreference() {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get({ showChen: false }, (result) => {
+                showChen = Boolean(result.showChen);
+                if (showChenToggle) {
+                    showChenToggle.checked = showChen;
+                }
+                renderTrainerButtons();
+                bindTrainerButtonEvents();
+                updateTrainerUI();
+            });
+            return;
+        }
+
+        try {
+            showChen = localStorage.getItem('showChen') === '1';
+        } catch (error) {
+            showChen = false;
+        }
+
+        if (showChenToggle) {
+            showChenToggle.checked = showChen;
+        }
+        renderTrainerButtons();
+        bindTrainerButtonEvents();
+        updateTrainerUI();
+    }
+
+    if (showChenToggle) {
+        showChenToggle.addEventListener('change', () => {
+            showChen = showChenToggle.checked;
+            saveShowChenPreference(showChen);
+            renderTrainerButtons();
+            bindTrainerButtonEvents();
+            updateTrainerUI();
+        });
+    }
+
+    loadShowChenPreference();
 
     // 初始化日历
     function initCalendar() {
