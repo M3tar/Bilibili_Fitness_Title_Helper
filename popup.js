@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedDate = null;
 
     let selectedTrainer = '祖嘉泽';
-    let selectedAerobic = '沉浸有氧';
+    let selectedAerobic = '手臂核心';
     let selectedTime = '晚间';
 
     // 添加博主选择事件监听
