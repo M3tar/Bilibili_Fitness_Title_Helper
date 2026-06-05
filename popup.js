@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const prevMonthBtn = document.querySelector('.prev-month');
     const nextMonthBtn = document.querySelector('.next-month');
     const generateBtn = document.getElementById('generate');
-    const resultDiv = document.getElementById('result');
+    const titlePreview = document.getElementById('result');
     const successMessage = document.querySelector('.success-message');
     const shortcutButtons = document.querySelectorAll('.shortcut-button');
     const trainerButtonsContainer = document.getElementById('trainerButtons');
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const aerobicGroup = document.getElementById('aerobicGroup');
 
     let currentDate = new Date();
-    let selectedDate = null;
+    let selectedDate = new Date();
 
     let showChen = false;
 
@@ -54,6 +54,58 @@ document.addEventListener('DOMContentLoaded', function() {
         trainerButtons = trainerButtonsContainer.querySelectorAll('.trainer-button');
     }
 
+    function syncTimeButtons() {
+        timeButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.time === selectedTime);
+        });
+    }
+
+    function updateShortcutButtons() {
+        shortcutButtons.forEach(button => {
+            const shortcutDate = new Date();
+            shortcutDate.setDate(shortcutDate.getDate() + parseInt(button.dataset.days));
+            button.classList.toggle('active', selectedDate && isSameDay(selectedDate, shortcutDate));
+        });
+    }
+
+    function getTitle() {
+        if (!selectedDate) {
+            return '';
+        }
+
+        const trainer = selectedTrainer;
+        const time = selectedTime;
+        const weekDay = selectedDate.getDay();
+        const dateStr = formatDate(selectedDate);
+
+        if (trainer === '祖嘉泽') {
+            return `「${dateStr}｜${time}」祖嘉泽有氧健身 直播回放录屏完整版`;
+        }
+
+        if (trainer === '张峰') {
+            let trainingType = getTrainingType(trainer, weekDay);
+            if (weekDay === 5) {
+                trainingType = selectedAerobic;
+            }
+            return `「${dateStr}｜${trainingType}」张峰-Give Me Five 直播回放录屏完整版`;
+        }
+
+        const trainingType = getTrainingType(trainer, weekDay);
+        return `「${dateStr}｜晚间｜${trainingType}」陈玉轩-轩誓肌动 直播回放录屏完整版`;
+    }
+
+    function refreshPreview() {
+        dateInput.value = selectedDate ? formatDate(selectedDate) : '';
+        updateShortcutButtons();
+        titlePreview.value = getTitle();
+    }
+
+    function refreshControls() {
+        syncTimeButtons();
+        updateAerobicGroup();
+        refreshPreview();
+    }
+
     // 添加博主选择事件监听
     function bindTrainerButtonEvents() {
         trainerButtons.forEach(button => {
@@ -64,16 +116,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.classList.add('active');
                 selectedTrainer = this.dataset.trainer;
 
-            // 根据选择的博主显示/隐藏时间段选择
-            if (selectedTrainer === '陈玉轩' || selectedTrainer === '张峰') {
-                selectedTime = '晚间';
-                timeGroup.classList.add('hidden');
-            } else {
-                timeGroup.classList.remove('hidden');
-            }
+                // 根据选择的博主显示/隐藏时间段选择
+                if (selectedTrainer === '陈玉轩' || selectedTrainer === '张峰') {
+                    selectedTime = '晚间';
+                    timeGroup.classList.add('hidden');
+                } else {
+                    timeGroup.classList.remove('hidden');
+                }
 
-            // 处理张峰周五的特殊情况
-            updateAerobicGroup();
+                refreshControls();
             });
         });
     }
@@ -86,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 激活当前按钮
             this.classList.add('active');
             selectedAerobic = this.dataset.aerobic;
+            refreshPreview();
         });
     });
 
@@ -97,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 激活当前按钮
             this.classList.add('active');
             selectedTime = this.dataset.time;
+            refreshPreview();
         });
     });
 
@@ -117,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             timeGroup.classList.remove('hidden');
         }
-        updateAerobicGroup();
+        refreshControls();
     }
 
     function saveShowChenPreference(value) {
@@ -242,7 +295,6 @@ document.addEventListener('DOMContentLoaded', function() {
             dayElement.addEventListener('click', (e) => {
                 e.stopPropagation();
                 selectedDate = currentDateObj;
-                dateInput.value = formatDate(selectedDate);
                 calendar.classList.remove('calendar-show');
 
                 // 移除其他日期的选中状态
@@ -254,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 dayElement.classList.add('selected');
 
                 // 更新有氧选择组显示状态
-                updateAerobicGroup();
+                refreshControls();
             });
 
             calendarDays.appendChild(dayElement);
@@ -320,34 +372,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return trainingMaps[trainer]?.[weekDay] || '';
     }
 
-    // 生成标题
-    function generateTitle() {
-        if (!selectedDate) {
-            alert('请选择日期！');
+    // 复制标题
+    function copyTitle() {
+        const title = titlePreview.value.trim();
+        if (!title) {
+            alert('没有可复制的标题！');
             return;
         }
-
-        const trainer = selectedTrainer;
-        const time = selectedTime;
-        const weekDay = selectedDate.getDay();
-        const dateStr = formatDate(selectedDate);
-        let title = '';
-
-        if (trainer === '祖嘉泽') {
-            title = `「${dateStr}｜${time}」祖嘉泽有氧健身 直播回放录屏完整版`;
-        } else if (trainer === '张峰') {
-            let trainingType = getTrainingType(trainer, weekDay);
-            // 如果是周五，使用用户选择的有氧类型
-            if (weekDay === 5) {
-                trainingType = selectedAerobic;
-            }
-            title = `「${dateStr}｜${trainingType}」张峰-Give Me Five 直播回放录屏完整版`;
-        } else {
-            const trainingType = getTrainingType(trainer, weekDay);
-            title = `「${dateStr}｜晚间｜${trainingType}」陈玉轩-轩誓肌动 直播回放录屏完整版`;
-        }
-
-        resultDiv.textContent = title;
         copyToClipboard(title);
     }
 
@@ -362,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 初始化事件监听
-    generateBtn.addEventListener('click', generateTitle);
+    generateBtn.addEventListener('click', copyTitle);
 
     // 快捷按钮事件监听
     shortcutButtons.forEach(button => {
@@ -370,13 +401,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const days = parseInt(button.dataset.days);
             selectedDate = new Date();
             selectedDate.setDate(selectedDate.getDate() + days);
-            dateInput.value = formatDate(selectedDate);
             currentDate = new Date(selectedDate);
             renderCalendar();
-            updateAerobicGroup();
+            refreshControls();
         });
     });
 
     // 初始化日历
     initCalendar();
+    refreshControls();
 });
