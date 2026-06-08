@@ -72,7 +72,11 @@
             <label for="result">标题预览</label>
             <textarea id="result" rows="2"></textarea>
         </div>
-        <button id="generate">复制标题</button>
+        <div class="action-row">
+            <button id="generate" class="copy-button">复制标题</button>
+            <button id="fillBilibili" class="fill-button">填写到 B 站</button>
+        </div>
+        <div class="fill-status" id="fillStatus" aria-live="polite"></div>
     </div>
     <div class="success-message">已复制到剪贴板</div>
     <script src="popup.js"></script>

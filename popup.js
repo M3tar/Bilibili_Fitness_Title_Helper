@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const prevMonthBtn = document.querySelector('.prev-month');
     const nextMonthBtn = document.querySelector('.next-month');
     const generateBtn = document.getElementById('generate');
+    const fillBtn = document.getElementById('fillBilibili');
+    const fillStatus = document.getElementById('fillStatus');
     const detectBtn = document.getElementById('detectCurrentPage');
     const detectStatus = document.getElementById('detectStatus');
     const titlePreview = document.getElementById('result');
@@ -29,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedTime = '晚间';
 
     const DETECT_MESSAGE_TYPE = 'GET_UPLOAD_TITLE_CANDIDATES';
+    const FILL_MESSAGE_TYPE = 'FILL_UPLOAD_FORM';
 
     function getTrainers() {
         return [
@@ -140,6 +143,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             detectStatus.appendChild(line);
+        });
+    }
+
+    function setFillStatus(items, type = 'neutral') {
+        if (!fillStatus) {
+            return;
+        }
+
+        fillStatus.innerHTML = '';
+        fillStatus.classList.remove('success', 'error', 'neutral');
+        fillStatus.classList.add(type);
+
+        const lines = Array.isArray(items) ? items : [items];
+        lines.forEach((item) => {
+            const line = document.createElement('div');
+            if (typeof item === 'string') {
+                line.textContent = item;
+            } else {
+                line.textContent = item.text;
+                if (item.type) {
+                    line.classList.add(item.type);
+                }
+            }
+            fillStatus.appendChild(line);
         });
     }
 
@@ -543,6 +570,69 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function requestFillUploadForm(tabId, payload, callback) {
+        chrome.tabs.sendMessage(tabId, {
+            type: FILL_MESSAGE_TYPE,
+            payload
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                callback({
+                    success: false,
+                    message: chrome.runtime.lastError.message,
+                    results: []
+                });
+                return;
+            }
+
+            callback(response || {
+                success: false,
+                message: '未收到投稿页响应',
+                results: []
+            });
+        });
+    }
+
+    function isContentScriptNotReady(message) {
+        const value = String(message || '');
+        return value.includes('Receiving end does not exist') ||
+            value.includes('message port closed') ||
+            value.includes('The message port closed');
+    }
+
+    function getActiveBilibiliUploadTab(callback) {
+        if (typeof chrome === 'undefined' || !chrome.tabs) {
+            callback({
+                success: false,
+                message: '当前环境不支持页面操作'
+            });
+            return;
+        }
+
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const tab = tabs && tabs[0];
+            if (!tab || !tab.id) {
+                callback({
+                    success: false,
+                    message: '未找到当前标签页'
+                });
+                return;
+            }
+
+            if (!isBilibiliUploadPage(tab.url || '')) {
+                callback({
+                    success: false,
+                    message: '请在 B 站投稿页使用'
+                });
+                return;
+            }
+
+            callback({
+                success: true,
+                tab
+            });
+        });
+    }
+
     function detectCurrentPageTitle() {
         if (!detectBtn) {
             return;
@@ -574,8 +664,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 detectBtn.disabled = false;
 
                 if (!response || !response.success) {
-                    const notReady = response && response.message && response.message.includes('Receiving end does not exist');
-                    setDetectStatus(notReady ? '请刷新 B 站投稿页后重试' : '未在当前页面找到可识别标题', 'error');
+                    const notReady = response && isContentScriptNotReady(response.message);
+                    setDetectStatus(notReady ? '请重新加载扩展并刷新投稿页后重试' : '未在当前页面找到可识别标题', 'error');
                     return;
                 }
 
@@ -587,6 +677,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 applyDetectedResult(result);
                 showDetectedSummary(result);
+            });
+        });
+    }
+
+    function showFillResults(response) {
+        const results = response.results || [];
+        if (results.length === 0) {
+            setFillStatus(response.message || '填写失败，请手动检查', 'error');
+            return;
+        }
+
+        setFillStatus(results.map((result) => ({
+            text: result.message,
+            type: result.success ? 'success-line' : 'warning-line'
+        })), response.success ? 'success' : 'error');
+    }
+
+    function fillCurrentUploadPage() {
+        if (!fillBtn) {
+            return;
+        }
+
+        const title = titlePreview.value.trim();
+        if (!title) {
+            setFillStatus('标题预览为空，请先生成或填写标题', 'error');
+            return;
+        }
+
+        if (Array.from(title).length > 80) {
+            setFillStatus('标题超过 80 字，请缩短后再填写', 'error');
+            return;
+        }
+
+        fillBtn.disabled = true;
+        setFillStatus('正在填写到 B 站...', 'neutral');
+
+        getActiveBilibiliUploadTab((tabResult) => {
+            if (!tabResult.success) {
+                fillBtn.disabled = false;
+                setFillStatus(tabResult.message, 'error');
+                return;
+            }
+
+            requestFillUploadForm(tabResult.tab.id, { title }, (response) => {
+                fillBtn.disabled = false;
+
+                if (!response || !response.success) {
+                    const notReady = response && isContentScriptNotReady(response.message);
+                    if (notReady) {
+                        setFillStatus('请重新加载扩展并刷新投稿页后重试', 'error');
+                        return;
+                    }
+                }
+
+                showFillResults(response);
             });
         });
     }
@@ -637,6 +782,9 @@ document.addEventListener('DOMContentLoaded', function() {
     generateBtn.addEventListener('click', copyTitle);
     if (detectBtn) {
         detectBtn.addEventListener('click', detectCurrentPageTitle);
+    }
+    if (fillBtn) {
+        fillBtn.addEventListener('click', fillCurrentUploadPage);
     }
 
     // 快捷按钮事件监听

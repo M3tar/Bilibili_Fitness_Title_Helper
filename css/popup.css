@@ -111,6 +111,35 @@ button:disabled {
     background-color: #f8f9fa;
 }
 
+.action-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    gap: 8px;
+}
+
+.copy-button {
+    background-color: #f6f7f8;
+    border: 1px solid #e3e5e7;
+    color: #18191c;
+}
+
+.copy-button:hover {
+    border-color: #00a1d6;
+    color: #00a1d6;
+    background-color: #f0f7fa;
+}
+
+.fill-button {
+    background-color: #00a1d6;
+    border: 1px solid #00a1d6;
+    color: white;
+}
+
+.fill-button:hover {
+    border-color: #00b5e5;
+    background-color: #00b5e5;
+}
+
 .preview-group {
     margin-top: 4px;
 }
@@ -236,7 +265,39 @@ button:disabled {
 
 .detect-status .notice-line {
     color: #d97706;
-    /*font-weight: 600;*/
+}
+
+.fill-status {
+    min-height: 18px;
+    color: #666;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 6px;
+}
+
+.fill-status:empty {
+    display: none;
+}
+
+.fill-status.success {
+    color: #248a3d;
+}
+
+.fill-status.error {
+    color: #d03030;
+}
+
+.fill-status.neutral {
+    color: #666;
+}
+
+.fill-status .success-line {
+    color: #248a3d;
+}
+
+.fill-status .warning-line {
+    color: #d03030;
+    font-weight: 600;
 }
 
 /* 日期选择器样式 */
