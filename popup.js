@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const prevMonthBtn = document.querySelector('.prev-month');
     const nextMonthBtn = document.querySelector('.next-month');
     const generateBtn = document.getElementById('generate');
+    const detectBtn = document.getElementById('detectCurrentPage');
+    const detectStatus = document.getElementById('detectStatus');
     const titlePreview = document.getElementById('result');
     const successMessage = document.querySelector('.success-message');
     const shortcutButtons = document.querySelectorAll('.shortcut-button');
@@ -25,6 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedTrainer = '祖嘉泽';
     let selectedAerobic = '手臂核心';
     let selectedTime = '晚间';
+
+    const DETECT_MESSAGE_TYPE = 'GET_UPLOAD_TITLE_CANDIDATES';
 
     function getTrainers() {
         return [
@@ -104,6 +108,39 @@ document.addEventListener('DOMContentLoaded', function() {
         syncTimeButtons();
         updateAerobicGroup();
         refreshPreview();
+    }
+
+    function setDetectStatus(message, type = 'neutral') {
+        if (!detectStatus) {
+            return;
+        }
+
+        detectStatus.textContent = message;
+        detectStatus.classList.remove('success', 'error', 'neutral');
+        detectStatus.classList.add(type);
+    }
+
+    function setDetectSummary(items, type = 'success') {
+        if (!detectStatus) {
+            return;
+        }
+
+        detectStatus.innerHTML = '';
+        detectStatus.classList.remove('success', 'error', 'neutral');
+        detectStatus.classList.add(type);
+
+        items.forEach((item) => {
+            const line = document.createElement('div');
+            if (typeof item === 'string') {
+                line.textContent = item;
+            } else {
+                line.textContent = item.text;
+                if (item.type) {
+                    line.classList.add(item.type);
+                }
+            }
+            detectStatus.appendChild(line);
+        });
     }
 
     // 添加博主选择事件监听
@@ -350,6 +387,210 @@ document.addEventListener('DOMContentLoaded', function() {
                date1.getDate() === date2.getDate();
     }
 
+    function isBilibiliUploadPage(url) {
+        try {
+            const pageUrl = new URL(url);
+            const hostname = pageUrl.hostname;
+            const isBilibili = hostname === 'bilibili.com' || hostname.endsWith('.bilibili.com');
+            return isBilibili && pageUrl.href.includes('upload');
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function extractDateFromText(text) {
+        const match = String(text || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) {
+            return null;
+        }
+
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        const date = new Date(year, month - 1, day);
+
+        if (
+            date.getFullYear() !== year ||
+            date.getMonth() !== month - 1 ||
+            date.getDate() !== day
+        ) {
+            return null;
+        }
+
+        return date;
+    }
+
+    function inferTrainerFromText(text) {
+        const value = String(text || '');
+        if (value.includes('跟练七天看变化')) {
+            return '祖嘉泽';
+        }
+
+        if (value.includes('夜猫子专属') || value.includes('减脂增肌操')) {
+            return '张峰';
+        }
+
+        return null;
+    }
+
+    function getBestDetectedResult(candidates) {
+        for (const candidate of candidates) {
+            const date = extractDateFromText(candidate);
+            if (date) {
+                return {
+                    date,
+                    trainer: inferTrainerFromText(candidate),
+                    sourceText: candidate
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function formatPlainDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const weekDay = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+        return `${year}-${month}-${day} 周${weekDay}`;
+    }
+
+    function getDetectedTrainerLabel(result) {
+        if (result.trainer) {
+            return {
+                text: `疑似博主：${result.trainer}`,
+                type: 'success-line'
+            };
+        }
+
+        return {
+            text: `未识别博主，沿用：${selectedTrainer}`,
+            type: 'warning-line'
+        };
+    }
+
+    function getCurrentWorkoutLabel() {
+        const weekDay = selectedDate.getDay();
+
+        if (selectedTrainer === '祖嘉泽') {
+            return {
+                text: `时间段：${selectedTime}`,
+                type: 'notice-line'
+            };
+        }
+
+        if (selectedTrainer === '张峰') {
+            if (weekDay === 5) {
+                return {
+                    text: `周五类型：${selectedAerobic}`,
+                    type: 'notice-line'
+                };
+            }
+
+            const trainingType = getTrainingType(selectedTrainer, weekDay);
+            return {
+                text: trainingType ? `训练类型：${trainingType}` : '训练类型：未配置',
+                type: 'notice-line'
+            };
+        }
+
+        const trainingType = getTrainingType(selectedTrainer, weekDay);
+        return {
+            text: trainingType ? `时间段：晚间；训练类型：${trainingType}` : '时间段：晚间；训练类型：未配置',
+            type: 'notice-line'
+        };
+    }
+
+    function showDetectedSummary(result) {
+        setDetectSummary([
+            `识别到日期：${formatPlainDate(selectedDate)}`,
+            getDetectedTrainerLabel(result),
+            getCurrentWorkoutLabel()
+        ]);
+    }
+
+    function applyDetectedResult(result) {
+        selectedDate = result.date;
+        currentDate = new Date(selectedDate);
+        renderCalendar();
+
+        if (result.trainer) {
+            selectedTrainer = result.trainer;
+            renderTrainerButtons();
+            bindTrainerButtonEvents();
+            updateTrainerUI();
+        } else {
+            refreshControls();
+        }
+    }
+
+    function requestCurrentPageCandidates(tabId, callback) {
+        chrome.tabs.sendMessage(tabId, { type: DETECT_MESSAGE_TYPE }, (response) => {
+            if (chrome.runtime.lastError) {
+                callback({
+                    success: false,
+                    message: chrome.runtime.lastError.message
+                });
+                return;
+            }
+
+            callback(response || {
+                success: false,
+                message: '未找到候选文本',
+                candidates: []
+            });
+        });
+    }
+
+    function detectCurrentPageTitle() {
+        if (!detectBtn) {
+            return;
+        }
+
+        if (typeof chrome === 'undefined' || !chrome.tabs) {
+            setDetectStatus('当前环境不支持页面识别', 'error');
+            return;
+        }
+
+        detectBtn.disabled = true;
+        setDetectStatus('正在识别当前页面...', 'neutral');
+
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const tab = tabs && tabs[0];
+            if (!tab || !tab.id) {
+                detectBtn.disabled = false;
+                setDetectStatus('未找到当前标签页', 'error');
+                return;
+            }
+
+            if (!isBilibiliUploadPage(tab.url || '')) {
+                detectBtn.disabled = false;
+                setDetectStatus('请在 B 站投稿页使用', 'error');
+                return;
+            }
+
+            requestCurrentPageCandidates(tab.id, (response) => {
+                detectBtn.disabled = false;
+
+                if (!response || !response.success) {
+                    const notReady = response && response.message && response.message.includes('Receiving end does not exist');
+                    setDetectStatus(notReady ? '请刷新 B 站投稿页后重试' : '未在当前页面找到可识别标题', 'error');
+                    return;
+                }
+
+                const result = getBestDetectedResult(response.candidates || []);
+                if (!result) {
+                    setDetectStatus('未识别到标题日期', 'error');
+                    return;
+                }
+
+                applyDetectedResult(result);
+                showDetectedSummary(result);
+            });
+        });
+    }
+
     // 获取训练类型 - 优化为支持多博主的通用函数
     function getTrainingType(trainer, weekDay) {
         // 训练类型映射表 - 使用对象字面量替代分散的条件判断
@@ -394,6 +635,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初始化事件监听
     generateBtn.addEventListener('click', copyTitle);
+    if (detectBtn) {
+        detectBtn.addEventListener('click', detectCurrentPageTitle);
+    }
 
     // 快捷按钮事件监听
     shortcutButtons.forEach(button => {

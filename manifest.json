@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "B站健身视频标题生成器",
-  "version": "1.4",
+  "version": "1.5",
   "description": "自动生成B站健身视频标题",
-  "permissions": ["clipboardWrite"],
+  "permissions": ["clipboardWrite", "tabs"],
+  "host_permissions": ["https://member.bilibili.com/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -17,6 +18,13 @@
     "48": "images/icon48.svg",
     "128": "images/icon128.svg"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://member.bilibili.com/platform/upload/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self'"
   }

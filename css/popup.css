@@ -100,6 +100,12 @@ button:active {
     transform: translateY(0);
 }
 
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+    transform: none;
+}
+
 #result {
     word-break: break-all;
     background-color: #f8f9fa;
@@ -168,6 +174,69 @@ button:active {
     background-color: #00b5e5;
     border-color: #00b5e5;
     color: white;
+}
+
+.detect-step {
+    margin-bottom: 10px;
+}
+
+.detect-button {
+    width: 100%;
+    padding: 11px 10px;
+    background-color: #00a1d6;
+    border: 1px solid #00a1d6;
+    border-radius: 8px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(0, 161, 214, 0.18);
+}
+
+.detect-button:hover {
+    border-color: #00b5e5;
+    color: white;
+    background-color: #00b5e5;
+    transform: translateY(-1px);
+}
+
+.detect-status {
+    min-height: 18px;
+    color: #666;
+    font-size: 12px;
+    line-height: 1.4;
+    max-height: 54px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+.detect-status:empty {
+    display: none;
+}
+
+.detect-status.success {
+    color: #248a3d;
+}
+
+.detect-status.error {
+    color: #d03030;
+}
+
+.detect-status.neutral {
+    color: #666;
+}
+
+.detect-status .success-line {
+    color: #248a3d;
+}
+
+.detect-status .warning-line {
+    color: #d03030;
+    font-weight: 600;
+}
+
+.detect-status .notice-line {
+    color: #d97706;
+    /*font-weight: 600;*/
 }
 
 /* 日期选择器样式 */
