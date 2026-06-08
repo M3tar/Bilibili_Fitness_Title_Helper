@@ -32,6 +32,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const DETECT_MESSAGE_TYPE = 'GET_UPLOAD_TITLE_CANDIDATES';
     const FILL_MESSAGE_TYPE = 'FILL_UPLOAD_FORM';
+    const DEFAULT_FILL_CONFIG = {
+        declaration: '内容无需标注',
+        category: '健身',
+        tags: ['减肥', '健身', '训练']
+    };
 
     function getTrainers() {
         return [
@@ -688,10 +693,24 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        setFillStatus(results.map((result) => ({
-            text: result.message,
-            type: result.success ? 'success-line' : 'warning-line'
-        })), response.success ? 'success' : 'error');
+        const lines = [];
+        results.forEach((result) => {
+            lines.push({
+                text: result.message,
+                type: result.success ? 'success-line' : 'warning-line'
+            });
+
+            if (!result.success && Array.isArray(result.debug)) {
+                result.debug.forEach((debugLine) => {
+                    lines.push({
+                        text: `诊断：${debugLine}`,
+                        type: 'notice-line'
+                    });
+                });
+            }
+        });
+
+        setFillStatus(lines, response.success ? 'success' : 'error');
     }
 
     function fillCurrentUploadPage() {
@@ -720,7 +739,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            requestFillUploadForm(tabResult.tab.id, { title }, (response) => {
+            requestFillUploadForm(tabResult.tab.id, {
+                title,
+                ...DEFAULT_FILL_CONFIG
+            }, (response) => {
                 fillBtn.disabled = false;
 
                 if (!response || !response.success) {
