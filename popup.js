@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const fillStatus = document.getElementById('fillStatus');
     const detectBtn = document.getElementById('detectCurrentPage');
     const detectStatus = document.getElementById('detectStatus');
+    const sourceBanner = document.getElementById('sourceBanner');
+    const sourceChip = document.getElementById('sourceChip');
     const titlePreview = document.getElementById('result');
     const successMessage = document.querySelector('.success-message');
     const shortcutButtons = document.querySelectorAll('.shortcut-button');
@@ -29,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedTrainer = '祖嘉泽';
     let selectedAerobic = '手臂核心';
     let selectedTime = '晚间';
+    let titleSource = 'default';
 
     const DETECT_MESSAGE_TYPE = 'GET_UPLOAD_TITLE_CANDIDATES';
     const FILL_MESSAGE_TYPE = 'FILL_UPLOAD_FORM';
@@ -37,6 +40,50 @@ document.addEventListener('DOMContentLoaded', function() {
         category: '健身',
         tags: ['减肥', '健身', '训练']
     };
+
+    function setTitleSource(source, detail) {
+        titleSource = source;
+        if (sourceChip) {
+            sourceChip.classList.remove('source-chip-default', 'source-chip-detected', 'source-chip-manual');
+            if (source === 'detected') {
+                sourceChip.textContent = '已识别';
+                sourceChip.classList.add('source-chip-detected');
+            } else if (source === 'manual') {
+                sourceChip.textContent = '手动';
+                sourceChip.classList.add('source-chip-manual');
+            } else {
+                sourceChip.textContent = '未识别';
+                sourceChip.classList.add('source-chip-default');
+            }
+        }
+
+        if (!sourceBanner) {
+            return;
+        }
+
+        sourceBanner.classList.remove('source-default', 'source-detected', 'source-manual');
+
+        if (source === 'detected') {
+            sourceBanner.textContent = detail || '已识别投稿页，请确认后填写';
+            sourceBanner.classList.add('source-detected');
+            return;
+        }
+
+        if (source === 'manual') {
+            sourceBanner.textContent = detail || '已手动调整，将按当前选择填写';
+            sourceBanner.classList.add('source-manual');
+            return;
+        }
+
+        sourceBanner.textContent = detail || '未识别，当前为默认日期';
+        sourceBanner.classList.add('source-default');
+    }
+
+    function markManualAdjustment(detail) {
+        if (titleSource === 'detected' || titleSource === 'default') {
+            setTitleSource('manual', detail);
+        }
+    }
 
     function getTrainers() {
         return [
@@ -184,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 激活当前按钮
                 this.classList.add('active');
                 selectedTrainer = this.dataset.trainer;
+                markManualAdjustment('已手动调整博主，将按当前选择填写');
 
                 // 根据选择的博主显示/隐藏时间段选择
                 if (selectedTrainer === '陈玉轩' || selectedTrainer === '张峰') {
@@ -206,6 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 激活当前按钮
             this.classList.add('active');
             selectedAerobic = this.dataset.aerobic;
+            markManualAdjustment('已手动调整类型，将按当前选择填写');
             refreshPreview();
         });
     });
@@ -218,6 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 激活当前按钮
             this.classList.add('active');
             selectedTime = this.dataset.time;
+            markManualAdjustment('已手动调整时间段，将按当前选择填写');
             refreshPreview();
         });
     });
@@ -364,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dayElement.addEventListener('click', (e) => {
                 e.stopPropagation();
                 selectedDate = currentDateObj;
+                markManualAdjustment('已手动调整日期，将按当前选择填写');
                 calendar.classList.remove('calendar-show');
 
                 // 移除其他日期的选中状态
@@ -535,11 +586,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showDetectedSummary(result) {
+        setTitleSource('detected', '已识别投稿页，请确认后填写');
         setDetectSummary([
             `识别到日期：${formatPlainDate(selectedDate)}`,
             getDetectedTrainerLabel(result),
             getCurrentWorkoutLabel()
         ]);
+    }
+
+    function getFillSourceNotice() {
+        if (titleSource === 'detected') {
+            return {
+                text: '提醒：本次使用识别结果填写，请确认投稿页内容',
+                type: 'source-notice-line'
+            };
+        }
+
+        if (titleSource === 'manual') {
+            return {
+                text: '提醒：本次使用手动调整内容填写，请确认预览标题',
+                type: 'source-notice-line'
+            };
+        }
+
+        return {
+            text: '提醒：本次使用默认日期填写，建议确认投稿页日期',
+            type: 'source-notice-line'
+        };
     }
 
     function applyDetectedResult(result) {
@@ -693,7 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const lines = [];
+        const lines = [getFillSourceNotice()];
         results.forEach((result) => {
             lines.push({
                 text: result.message,
@@ -816,12 +889,20 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedDate = new Date();
             selectedDate.setDate(selectedDate.getDate() + days);
             currentDate = new Date(selectedDate);
+            markManualAdjustment('已手动调整日期，将按当前选择填写');
             renderCalendar();
             refreshControls();
         });
     });
 
+    if (titlePreview) {
+        titlePreview.addEventListener('input', () => {
+            markManualAdjustment('已手动编辑标题，将按预览内容填写');
+        });
+    }
+
     // 初始化日历
     initCalendar();
     refreshControls();
+    setTitleSource('default');
 });

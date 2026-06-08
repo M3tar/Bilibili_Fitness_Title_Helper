@@ -8,75 +8,85 @@
 <body>
     <div class="container">
         <h1 class="title">B站健身视频标题生成器</h1>
-        <div class="form-group workflow-step detect-step">
+        <section class="workflow-step detect-step">
             <button type="button" class="detect-button" id="detectCurrentPage">识别当前投稿页</button>
             <div class="detect-status" id="detectStatus" aria-live="polite"></div>
-        </div>
-        <div class="form-group">
-            <label>选择日期</label>
-            <div class="date-controls">
-                <div class="date-picker-container">
-                    <input type="text" class="date-picker-input" readonly>
-                    <div class="date-picker-calendar">
-                        <div class="calendar-header">
-                            <div class="calendar-nav">
-                                <button class="prev-month">&lt;</button>
-                                <div class="calendar-title"></div>
-                                <button class="next-month">&gt;</button>
+        </section>
+
+        <section class="workflow-step">
+            <div class="form-group">
+                <label>选择日期</label>
+                <div class="date-controls">
+                    <div class="date-picker-container">
+                        <input type="text" class="date-picker-input" readonly>
+                        <div class="date-picker-calendar">
+                            <div class="calendar-header">
+                                <div class="calendar-nav">
+                                    <button class="prev-month">&lt;</button>
+                                    <div class="calendar-title"></div>
+                                    <button class="next-month">&gt;</button>
+                                </div>
                             </div>
+                            <div class="calendar-weekdays">
+                                <div>日</div>
+                                <div>一</div>
+                                <div>二</div>
+                                <div>三</div>
+                                <div>四</div>
+                                <div>五</div>
+                                <div>六</div>
+                            </div>
+                            <div class="calendar-days"></div>
                         </div>
-                        <div class="calendar-weekdays">
-                            <div>日</div>
-                            <div>一</div>
-                            <div>二</div>
-                            <div>三</div>
-                            <div>四</div>
-                            <div>五</div>
-                            <div>六</div>
-                        </div>
-                        <div class="calendar-days"></div>
+                    </div>
+                    <div class="shortcut-buttons">
+                        <button class="shortcut-button" data-days="0">今天</button>
+                        <button class="shortcut-button" data-days="-1">昨天</button>
                     </div>
                 </div>
-                <div class="shortcut-buttons">
-                    <button class="shortcut-button" data-days="0">今天</button>
-                    <button class="shortcut-button" data-days="-1">昨天</button>
+            </div>
+            <div class="form-group">
+                <label>选择博主</label>
+                <div class="trainer-buttons" id="trainerButtons"></div>
+                <div class="toggle-row">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="showChenToggle">
+                        <span>显示陈玉轩</span>
+                    </label>
                 </div>
             </div>
-        </div>
-        <div class="form-group">
-            <label>选择博主</label>
-            <div class="trainer-buttons" id="trainerButtons"></div>
-            <div class="toggle-row">
-                <label class="toggle-label">
-                    <input type="checkbox" id="showChenToggle">
-                    <span>显示陈玉轩</span>
-                </label>
+            <div class="form-group" id="timeGroup">
+                <label>时间段</label>
+                <div class="time-buttons">
+                    <button type="button" class="time-button" data-time="早间">早间</button>
+                    <button type="button" class="time-button active" data-time="晚间">晚间</button>
+                </div>
             </div>
-        </div>
-        <div class="form-group" id="timeGroup">
-            <label>时间段</label>
-            <div class="time-buttons">
-                <button type="button" class="time-button" data-time="早间">早间</button>
-                <button type="button" class="time-button active" data-time="晚间">晚间</button>
+            <div class="form-group hidden" id="aerobicGroup">
+                <label>类型</label>
+                <div class="aerobic-buttons">
+                    <button type="button" class="aerobic-button active" data-aerobic="手臂核心">手臂核心</button>
+                    <button type="button" class="aerobic-button" data-aerobic="有氧双冠">有氧双冠</button>
+                    <button type="button" class="aerobic-button" data-aerobic="沉浸有氧">沉浸有氧</button>
+                </div>
             </div>
-        </div>
-        <div class="form-group hidden" id="aerobicGroup">
-            <label>类型</label>
-            <div class="aerobic-buttons">
-                <button type="button" class="aerobic-button active" data-aerobic="手臂核心">手臂核心</button>
-                <button type="button" class="aerobic-button" data-aerobic="有氧双冠">有氧双冠</button>
-                <button type="button" class="aerobic-button" data-aerobic="沉浸有氧">沉浸有氧</button>
+            <div class="form-group preview-group">
+                <div class="label-row">
+                    <label for="result">标题预览</label>
+                    <span class="source-chip source-chip-default" id="sourceChip">未识别</span>
+                </div>
+                <textarea id="result" rows="2"></textarea>
             </div>
-        </div>
-        <div class="form-group preview-group">
-            <label for="result">标题预览</label>
-            <textarea id="result" rows="2"></textarea>
-        </div>
-        <div class="action-row">
-            <button id="generate" class="copy-button">复制标题</button>
-            <button id="fillBilibili" class="fill-button">填写到 B 站</button>
-        </div>
-        <div class="fill-status" id="fillStatus" aria-live="polite"></div>
+        </section>
+
+        <section class="workflow-step action-step">
+            <div class="source-banner source-default" id="sourceBanner">未识别，当前为默认日期</div>
+            <div class="action-row">
+                <button id="generate" class="copy-button">复制标题</button>
+                <button id="fillBilibili" class="fill-button">填写到 B 站</button>
+            </div>
+            <div class="fill-status" id="fillStatus" aria-live="polite"></div>
+        </section>
     </div>
     <div class="success-message">已复制到剪贴板</div>
     <script src="popup.js"></script>

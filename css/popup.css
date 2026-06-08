@@ -30,12 +30,90 @@ body {
     margin-bottom: 10px;
 }
 
+.workflow-step {
+    border-top: 1px solid #f0f1f2;
+    padding-top: 11px;
+    margin-top: 11px;
+}
+
+.workflow-step:first-of-type {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.source-banner {
+    margin: 0 0 8px;
+    padding: 7px 9px;
+    border-radius: 7px;
+    font-size: 12px;
+    line-height: 1.35;
+    border: 1px solid transparent;
+}
+
+.source-default {
+    color: #9a5b00;
+    background: #fff7e6;
+    border-color: #ffe0a3;
+}
+
+.source-detected {
+    color: #248a3d;
+    background: #eefaf1;
+    border-color: #c8edcf;
+}
+
+.source-manual {
+    color: #006a9e;
+    background: #eef8fc;
+    border-color: #bfe8f6;
+}
+
 label {
     display: block;
     margin-bottom: 6px;
     color: #18191c;
     font-size: 14px;
     font-weight: 500;
+}
+
+.label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.label-row label {
+    margin-bottom: 0;
+}
+
+.source-chip {
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.source-chip-default {
+    color: #9a5b00;
+    background: #fff7e6;
+    border-color: #ffe0a3;
+}
+
+.source-chip-manual {
+    color: #006a9e;
+    background: #eef8fc;
+    border-color: #bfe8f6;
+}
+
+.source-chip-detected {
+    color: #248a3d;
+    background: #eefaf1;
+    border-color: #c8edcf;
 }
 
 select, input, textarea {
@@ -205,10 +283,6 @@ button:disabled {
     color: white;
 }
 
-.detect-step {
-    margin-bottom: 10px;
-}
-
 .detect-button {
     width: 100%;
     padding: 11px 10px;
@@ -298,6 +372,19 @@ button:disabled {
 .fill-status .warning-line {
     color: #d03030;
     font-weight: 600;
+}
+
+.fill-status .notice-line {
+    color: #d97706;
+}
+
+.fill-status .manual-line {
+    color: #d97706;
+}
+
+.fill-status .source-notice-line {
+    color: #d97706;
+    font-size: 14px;
 }
 
 /* 日期选择器样式 */
