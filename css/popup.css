@@ -12,7 +12,10 @@ body {
 }
 
 .container {
-    background: white;
+    /*面板左上角加一层很淡的背景高光块，不需要可以直接注释 radial-gradient*/
+    background:
+        /*radial-gradient(circle at 0 0, rgba(0, 161, 214, 0.08), rgba(0, 161, 214, 0) 150px),*/
+        white;
     border-radius: 12px;
     padding: 14px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
@@ -42,6 +45,44 @@ body {
     border-top: none;
     padding-top: 0;
     margin-top: 0;
+}
+
+.action-step {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    margin-top: 14px;
+    margin-right: -14px;
+    margin-bottom: -14px;
+    margin-left: -14px;
+    padding: 14px;
+    background:
+    /*底部操作区背景使用半透明的玻璃质感，配合背景高光块形成层次感，自身背景从左到右渐变，增强视觉效果*/
+        linear-gradient(90deg, rgba(255, 255, 255, 0.92) 0%, rgba(249, 252, 253, 0.88) 56%, rgba(225, 247, 253, 0.78) 100%),
+        rgba(247, 248, 250, 0.48);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    backdrop-filter: blur(26px) saturate(190%);
+    -webkit-backdrop-filter: blur(26px) saturate(190%);
+    box-shadow: none;
+    transition: box-shadow 0.18s ease;
+}
+
+.action-step::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 14px;
+    left: 14px;
+    height: 1px;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.action-step.action-step-affixed {
+    box-shadow:
+        0 -18px 36px 0 hsla(225, 4%, 79%, 0.62),
+        0 -4px 12px 0 rgba(99, 110, 116, 0.14);
 }
 
 .source-banner {
@@ -344,7 +385,9 @@ button:disabled {
 }
 
 .fill-status {
+    position: relative;
     min-height: 18px;
+    padding-right: 28px;
     color: #666;
     font-size: 12px;
     line-height: 1.4;
@@ -387,6 +430,61 @@ button:disabled {
 .fill-status .source-notice-line {
     color: #d97706;
     font-size: 14px;
+}
+
+.fill-status-close {
+    position: absolute;
+    top: -2px;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 50%;
+    color: #6b7280;
+    background: rgba(15, 23, 42, 0.06);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease;
+}
+
+.fill-status-close:hover {
+    color: #18191c;
+    background: rgba(15, 23, 42, 0.11);
+}
+
+.fill-status .fill-summary-success-line,
+.fill-status .fill-summary-warning-line,
+.fill-status .fill-summary-notice-line {
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.fill-status .fill-summary-success-line {
+    color: #248a3d;
+}
+
+.fill-status .fill-summary-warning-line {
+    color: #d03030;
+}
+
+.fill-status .fill-summary-notice-line {
+    color: #666;
+}
+
+.fill-detail {
+    display: grid;
+    gap: 2px;
+    width: calc(100% + 28px);
+    margin-top: 6px;
+    margin-right: -28px;
+    padding-top: 6px;
+    border-top: 1px dashed #d9edf7;
 }
 
 /* 日期选择器样式 */
@@ -515,8 +613,8 @@ button:disabled {
     gap: 8px;
 }
 
-.toggle-row {
-    margin-top: 6px;
+.trainer-label-row {
+    margin-bottom: 6px;
 }
 
 .toggle-label {
@@ -527,6 +625,12 @@ button:disabled {
     color: #4c4c4c;
     cursor: pointer;
     user-select: none;
+}
+
+.trainer-toggle-label {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+    font-weight: 500;
 }
 
 .toggle-label input[type="checkbox"] {

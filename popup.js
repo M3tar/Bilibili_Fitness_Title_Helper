@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const generateBtn = document.getElementById('generate');
     const fillBtn = document.getElementById('fillBilibili');
     const fillStatus = document.getElementById('fillStatus');
+    const actionStep = document.querySelector('.action-step');
     const detectBtn = document.getElementById('detectCurrentPage');
     const detectStatus = document.getElementById('detectStatus');
     const sourceBanner = document.getElementById('sourceBanner');
@@ -223,6 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fillStatus.innerHTML = '';
         fillStatus.classList.remove('success', 'error', 'neutral');
         fillStatus.classList.add(type);
+        appendFillCloseButton(fillStatus);
 
         const lines = Array.isArray(items) ? items : [items];
         lines.forEach((item) => {
@@ -236,6 +238,95 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             fillStatus.appendChild(line);
+        });
+        updateActionStepAffixState();
+    }
+
+    function clearFillStatus() {
+        if (!fillStatus) {
+            return;
+        }
+
+        fillStatus.innerHTML = '';
+        fillStatus.classList.remove('success', 'error', 'neutral');
+        updateActionStepAffixState();
+    }
+
+    function appendFillCloseButton(parent) {
+        if (fillBtn && fillBtn.disabled) {
+            return;
+        }
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'fill-status-close';
+        button.setAttribute('aria-label', '收起填写结果');
+        button.textContent = '×';
+        button.addEventListener('click', clearFillStatus);
+        parent.appendChild(button);
+    }
+
+    function getFillStepLabel(step) {
+        const labels = {
+            title: '标题',
+            declaration: '声明',
+            category: '分区',
+            tags: '标签',
+            cover: '封面'
+        };
+
+        return labels[step] || step;
+    }
+
+    function appendStatusLine(parent, text, className) {
+        const line = document.createElement('div');
+        line.textContent = text;
+        if (className) {
+            line.classList.add(className);
+        }
+        parent.appendChild(line);
+        return line;
+    }
+
+    function renderCompactFillStatus({ notice, summary, summaryType = 'notice-line', details = [], type = 'neutral' }) {
+        if (!fillStatus) {
+            return;
+        }
+
+        fillStatus.innerHTML = '';
+        fillStatus.classList.remove('success', 'error', 'neutral');
+        fillStatus.classList.add(type);
+        appendFillCloseButton(fillStatus);
+
+        appendStatusLine(fillStatus, notice.text, notice.type || 'source-notice-line');
+
+        if (summary) {
+            appendStatusLine(fillStatus, summary, `fill-summary-${summaryType}`);
+        }
+
+        if (details.length > 0) {
+            const detail = document.createElement('div');
+            detail.className = 'fill-detail';
+
+            details.forEach((item) => {
+                appendStatusLine(detail, item.text, item.type);
+            });
+
+            fillStatus.appendChild(detail);
+        }
+        updateActionStepAffixState();
+    }
+
+    function updateActionStepAffixState() {
+        if (!actionStep) {
+            return;
+        }
+
+        requestAnimationFrame(() => {
+            const scrollElement = document.scrollingElement || document.documentElement;
+            const maxScrollTop = scrollElement.scrollHeight - scrollElement.clientHeight;
+            const isAtBottom = maxScrollTop <= 0 || scrollElement.scrollTop >= maxScrollTop - 2;
+            actionStep.classList.toggle('action-step-affixed', !isAtBottom);
         });
     }
 
@@ -671,7 +762,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         return {
-            text: '提醒：本次使用默认日期填写，建议确认投稿页投稿页内容',
+            text: '提醒：本次使用默认日期填写，请确认投稿页内容',
             type: 'source-notice-line'
         };
     }
@@ -827,16 +918,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const lines = [getFillSourceNotice()];
+        const successResults = results.filter((result) => result.success);
+        const failedResults = results.filter((result) => !result.success);
+        const details = [];
+
         results.forEach((result) => {
-            lines.push({
+            details.push({
                 text: result.message,
                 type: result.success ? 'success-line' : 'warning-line'
             });
 
             if (!result.success && Array.isArray(result.debug)) {
                 result.debug.forEach((debugLine) => {
-                    lines.push({
+                    details.push({
                         text: `诊断：${debugLine}`,
                         type: 'notice-line'
                     });
@@ -844,7 +938,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        setFillStatus(lines, response.success ? 'success' : 'error');
+        const failedLabels = failedResults.map((result) => getFillStepLabel(result.field)).join('、');
+        const summary = response.success ? '' : `${failedLabels || '部分项目'}需手动检查`;
+
+        renderCompactFillStatus({
+            notice: getFillSourceNotice(),
+            summary,
+            summaryType: response.success ? 'success-line' : 'warning-line',
+            details,
+            type: response.success ? 'success' : 'error'
+        });
     }
 
     function setFillProgress(step, message, type = 'notice-line') {
@@ -861,13 +964,25 @@ document.addEventListener('DOMContentLoaded', function() {
             fillProgressItems.push(nextItem);
         }
 
-        setFillStatus([
-            getFillSourceNotice(),
-            ...fillProgressItems.map((item) => ({
+        const stepItems = fillProgressItems.filter((item) => item.step !== 'start');
+        const completedCount = stepItems.filter((item) => item.type === 'success-line').length;
+        const failedCount = stepItems.filter((item) => item.type === 'warning-line').length;
+        const latest = fillProgressItems[fillProgressItems.length - 1];
+
+        const summary = failedCount > 0
+            ? `已完成 ${completedCount} 项，${getFillStepLabel(latest.step)}需检查`
+            : '';
+
+        renderCompactFillStatus({
+            notice: getFillSourceNotice(),
+            summary,
+            summaryType: failedCount > 0 ? 'warning-line' : latest.type,
+            details: fillProgressItems.map((item) => ({
                 text: item.text,
                 type: item.type
-            }))
-        ], 'neutral');
+            })),
+            type: failedCount > 0 ? 'error' : 'neutral'
+        });
     }
 
     function handleFillProgressMessage(message) {
@@ -986,6 +1101,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
         chrome.runtime.onMessage.addListener(handleFillProgressMessage);
     }
+    document.addEventListener('scroll', updateActionStepAffixState, { passive: true });
+    window.addEventListener('resize', updateActionStepAffixState);
 
     // 快捷按钮事件监听
     shortcutButtons.forEach(button => {
@@ -1010,4 +1127,5 @@ document.addEventListener('DOMContentLoaded', function() {
     initCalendar();
     refreshControls();
     setTitleSource('default');
+    updateActionStepAffixState();
 });
