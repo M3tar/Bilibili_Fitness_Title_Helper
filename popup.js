@@ -32,13 +32,30 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedAerobic = '手臂核心';
     let selectedTime = '晚间';
     let titleSource = 'default';
+    let activeFillRunId = null;
+    let fillProgressItems = [];
 
     const DETECT_MESSAGE_TYPE = 'GET_UPLOAD_TITLE_CANDIDATES';
     const FILL_MESSAGE_TYPE = 'FILL_UPLOAD_FORM';
+    const FILL_PROGRESS_MESSAGE_TYPE = 'FILL_UPLOAD_PROGRESS';
     const DEFAULT_FILL_CONFIG = {
         declaration: '内容无需标注',
         category: '健身',
         tags: ['减肥', '健身', '训练']
+    };
+    const COVER_CONFIG_BY_TRAINER = {
+        '祖嘉泽': {
+            path: 'covers/zu-jiaze.jpg',
+            filename: 'zu-jiaze.jpg'
+        },
+        '陈玉轩': {
+            path: 'covers/chen-yuxuan.jpg',
+            filename: 'chen-yuxuan.jpg'
+        },
+        '张峰': {
+            path: 'covers/zhang-feng.png',
+            filename: 'zhang-feng.png'
+        }
     };
 
     function setTitleSource(source, detail) {
@@ -505,11 +522,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function inferTrainerFromText(text) {
         const value = String(text || '');
-        if (value.includes('跟练七天看变化')) {
+        if (
+            value.includes('祖嘉泽') ||
+            value.includes('跟练七天看变化') ||
+            value.includes('跟练七天') ||
+            value.includes('七天看变化')
+        ) {
             return '祖嘉泽';
         }
 
-        if (value.includes('夜猫子专属') || value.includes('减脂增肌操')) {
+        if (value.includes('张峰') || value.includes('夜猫子专属') || value.includes('减脂增肌操')) {
             return '张峰';
         }
 
@@ -517,14 +539,53 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getBestDetectedResult(candidates) {
-        for (const candidate of candidates) {
-            const date = extractDateFromText(candidate);
-            if (date) {
+        const results = candidates
+            .map((candidate, index) => {
+                const date = extractDateFromText(candidate);
+                if (!date) {
+                    return null;
+                }
+
+                const sourceText = String(candidate || '');
+                const trainer = inferTrainerFromText(sourceText);
+                let score = 1000 - index;
+
+                if (trainer) {
+                    score += 10000;
+                }
+                if (sourceText.includes('.mp4') || sourceText.includes('上传中') || sourceText.includes('已上传')) {
+                    score += 800;
+                }
+                if (sourceText.includes('跟练') || sourceText.includes('夜猫子') || sourceText.includes('减脂')) {
+                    score += 500;
+                }
+
                 return {
                     date,
-                    trainer: inferTrainerFromText(candidate),
-                    sourceText: candidate
+                    trainer,
+                    sourceText,
+                    score
                 };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.score - a.score);
+
+        if (results.length === 0) {
+            return null;
+        }
+
+        return {
+            date: results[0].date,
+            trainer: results[0].trainer || getTrainerFromDetectedCandidates(candidates),
+            sourceText: results[0].sourceText
+        };
+    }
+
+    function getTrainerFromDetectedCandidates(candidates) {
+        for (const candidate of candidates) {
+            const trainer = inferTrainerFromText(candidate);
+            if (trainer) {
+                return trainer;
             }
         }
 
@@ -604,13 +665,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (titleSource === 'manual') {
             return {
-                text: '提醒：本次使用手动调整内容填写，请确认预览标题',
+                text: '提醒：本次使用手动调整内容填写，请确认投稿页内容',
                 type: 'source-notice-line'
             };
         }
 
         return {
-            text: '提醒：本次使用默认日期填写，建议确认投稿页日期',
+            text: '提醒：本次使用默认日期填写，建议确认投稿页投稿页内容',
             type: 'source-notice-line'
         };
     }
@@ -786,6 +847,41 @@ document.addEventListener('DOMContentLoaded', function() {
         setFillStatus(lines, response.success ? 'success' : 'error');
     }
 
+    function setFillProgress(step, message, type = 'notice-line') {
+        const existing = fillProgressItems.find((item) => item.step === step);
+        const nextItem = {
+            step,
+            text: message,
+            type
+        };
+
+        if (existing) {
+            Object.assign(existing, nextItem);
+        } else {
+            fillProgressItems.push(nextItem);
+        }
+
+        setFillStatus([
+            getFillSourceNotice(),
+            ...fillProgressItems.map((item) => ({
+                text: item.text,
+                type: item.type
+            }))
+        ], 'neutral');
+    }
+
+    function handleFillProgressMessage(message) {
+        if (!message || message.type !== FILL_PROGRESS_MESSAGE_TYPE) {
+            return;
+        }
+
+        if (!activeFillRunId || message.runId !== activeFillRunId) {
+            return;
+        }
+
+        setFillProgress(message.step, message.message, message.lineType || 'notice-line');
+    }
+
     function fillCurrentUploadPage() {
         if (!fillBtn) {
             return;
@@ -803,20 +899,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         fillBtn.disabled = true;
-        setFillStatus('正在填写到 B 站...', 'neutral');
+        activeFillRunId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        fillProgressItems = [];
+        setFillProgress('start', '正在准备填写到 B 站...', 'notice-line');
 
         getActiveBilibiliUploadTab((tabResult) => {
             if (!tabResult.success) {
                 fillBtn.disabled = false;
+                activeFillRunId = null;
                 setFillStatus(tabResult.message, 'error');
                 return;
             }
 
             requestFillUploadForm(tabResult.tab.id, {
+                runId: activeFillRunId,
                 title,
+                cover: COVER_CONFIG_BY_TRAINER[selectedTrainer] || null,
                 ...DEFAULT_FILL_CONFIG
             }, (response) => {
                 fillBtn.disabled = false;
+                activeFillRunId = null;
 
                 if (!response || !response.success) {
                     const notReady = response && isContentScriptNotReady(response.message);
@@ -880,6 +982,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (fillBtn) {
         fillBtn.addEventListener('click', fillCurrentUploadPage);
+    }
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener(handleFillProgressMessage);
     }
 
     // 快捷按钮事件监听

@@ -1,6 +1,7 @@
 (function() {
     const DETECT_MESSAGE_TYPE = 'GET_UPLOAD_TITLE_CANDIDATES';
     const FILL_MESSAGE_TYPE = 'FILL_UPLOAD_FORM';
+    const FILL_PROGRESS_MESSAGE_TYPE = 'FILL_UPLOAD_PROGRESS';
     const DATE_PATTERN = /\d{4}-\d{2}-\d{2}/;
 
     function isVisible(element) {
@@ -1154,13 +1155,418 @@
         };
     }
 
-    async function fillUploadForm(payload) {
-        const results = [
-            fillTitle(payload?.title)
+    function getFileInputContext(element) {
+        let current = element;
+        const parts = [];
+
+        for (let i = 0; i < 8 && current; i++) {
+            parts.push(normalizeText([
+                current.textContent,
+                current.className,
+                current.id,
+                current.getAttribute?.('aria-label'),
+                current.getAttribute?.('title')
+            ].filter(Boolean).join(' ')));
+            current = current.parentElement;
+        }
+
+        return parts.join(' ').slice(0, 800);
+    }
+
+    function scoreCoverFileInput(input) {
+        const accept = String(input.getAttribute('accept') || '').toLowerCase();
+        const attrs = normalizeText([
+            input.getAttribute('name'),
+            input.getAttribute('id'),
+            input.getAttribute('class'),
+            input.getAttribute('aria-label'),
+            input.getAttribute('title')
+        ].filter(Boolean).join(' ')).toLowerCase();
+        const context = getFileInputContext(input);
+        const contextLower = context.toLowerCase();
+
+        let score = 0;
+        if (accept.includes('image')) {
+            score += 8;
+        }
+        if (/\.(jpg|jpeg|png|webp)/.test(accept)) {
+            score += 4;
+        }
+        if (accept.includes('video') || accept.includes('audio')) {
+            score -= 10;
+        }
+        if (attrs.includes('cover') || attrs.includes('poster') || attrs.includes('thumbnail')) {
+            score += 8;
+        }
+        if (context.includes('封面') || context.includes('上传封面') || context.includes('更换封面')) {
+            score += 10;
+        }
+        if (contextLower.includes('cover') || contextLower.includes('poster') || contextLower.includes('thumbnail')) {
+            score += 6;
+        }
+
+        return score;
+    }
+
+    function findCoverFileInput() {
+        const inputs = Array.from(document.querySelectorAll('input[type="file"]'))
+            .map((input) => ({
+                input,
+                score: scoreCoverFileInput(input)
+            }))
+            .filter((item) => !item.input.disabled && item.score > 0)
+            .sort((a, b) => b.score - a.score);
+
+        return inputs[0]?.input || null;
+    }
+
+    function findCoverEntryButton() {
+        const keywords = ['上传封面', '更换封面', '修改封面', '选择封面', '封面设置', '封面'];
+        const attrPattern = /cover|poster|thumbnail|thumb|pic|image|crop|封面/i;
+        const elements = Array.from(document.querySelectorAll('button, div, span, a, img, canvas, label, [role="button"], [class*="cover"], [class*="Cover"], [id*="cover"], [id*="Cover"]'))
+            .map((element) => {
+                if (!isVisible(element)) {
+                    return null;
+                }
+
+                const text = normalizeText(element.textContent);
+                const attrs = normalizeText([
+                    element.getAttribute('aria-label'),
+                    element.getAttribute('title'),
+                    element.getAttribute('alt'),
+                    element.getAttribute('src'),
+                    element.getAttribute('style'),
+                    element.className,
+                    element.id
+                ].filter(Boolean).join(' '));
+                const haystack = `${text} ${attrs}`;
+                if (!keywords.some((keyword) => haystack.includes(keyword)) && !attrPattern.test(haystack)) {
+                    return null;
+                }
+
+                const rect = getElementRect(element);
+                if (!rect || rect.width < 20 || rect.height < 18) {
+                    return null;
+                }
+
+                const classChain = getClassChain(element, 6);
+                const clickableBonus = /button|btn|upload|cover|empty|setting/.test(classChain) ? -140 : 0;
+                const attrCoverBonus = attrPattern.test(attrs) ? -180 : 0;
+                const exactBonus = ['上传封面', '更换封面', '修改封面', '选择封面', '封面设置'].includes(text) ? -320 : 0;
+                const shortTextBonus = text.length > 0 && text.length <= 16 ? -80 : 0;
+                const mediaBonus = ['IMG', 'CANVAS', 'LABEL'].includes(element.tagName) ? -60 : 0;
+                const area = rect.width * rect.height;
+                const hugePenalty = area > 160000 ? 420 : 0;
+                const coverSettingSizeBonus = text === '封面设置' && area < 40000 ? -260 : 0;
+                const score = rect.top + area * 0.002 + clickableBonus + attrCoverBonus + exactBonus + shortTextBonus + mediaBonus + coverSettingSizeBonus + hugePenalty;
+
+                return {
+                    element,
+                    score
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.score - b.score);
+
+        return elements[0]?.element || null;
+    }
+
+    function getCoverEntryClickTargets(element) {
+        const targets = [];
+        if (!element) {
+            return targets;
+        }
+
+        targets.push(element);
+        let current = element.parentElement;
+        for (let i = 0; i < 5 && current; i++) {
+            const className = String(current.className || '').toLowerCase();
+            const role = current.getAttribute('role');
+            const style = window.getComputedStyle(current);
+            if (
+                role === 'button' ||
+                current.tagName === 'BUTTON' ||
+                current.tagName === 'LABEL' ||
+                style.cursor === 'pointer' ||
+                /cover|poster|thumbnail|upload|button|btn|pic|image|crop/.test(className)
+            ) {
+                targets.push(current);
+            }
+            current = current.parentElement;
+        }
+
+        return targets.filter((target, index, list) => {
+            return target && isVisible(target) && list.indexOf(target) === index;
+        });
+    }
+
+    function getVisibleCoverAreas() {
+        return Array.from(document.querySelectorAll('.cover-img, .cover-item, .cover-empty, .cover-main, [class*="cover"], [class*="Cover"]'))
+            .filter(isVisible)
+            .sort((a, b) => {
+                const aText = normalizeText(a.textContent);
+                const bText = normalizeText(b.textContent);
+                const aRect = a.getBoundingClientRect();
+                const bRect = b.getBoundingClientRect();
+                const aExact = aText === '封面设置' ? -1000 : 0;
+                const bExact = bText === '封面设置' ? -1000 : 0;
+                const aAreaPenalty = aRect.width * aRect.height * 0.001;
+                const bAreaPenalty = bRect.width * bRect.height * 0.001;
+                return (aRect.top + aAreaPenalty + aExact) - (bRect.top + bAreaPenalty + bExact);
+            })
+            .slice(0, 8);
+    }
+
+    function findLocalCoverUploadEntry() {
+        const keywords = ['本地上传', '上传图片', '上传封面', '选择图片', '选择封面', '自定义封面'];
+        const elements = Array.from(document.querySelectorAll('button, div, span, a, label, [role="button"]'))
+            .map((element) => {
+                if (!isVisible(element)) {
+                    return null;
+                }
+
+                const text = normalizeText(element.textContent);
+                const attrs = normalizeText([
+                    element.getAttribute('aria-label'),
+                    element.getAttribute('title'),
+                    element.className,
+                    element.id
+                ].filter(Boolean).join(' '));
+                const haystack = `${text} ${attrs}`;
+                if (!keywords.some((keyword) => haystack.includes(keyword))) {
+                    return null;
+                }
+
+                const rect = getElementRect(element);
+                if (!rect) {
+                    return null;
+                }
+
+                const exactBonus = keywords.includes(text) ? -260 : 0;
+                const modalBonus = /封面|裁剪|上传|cover|crop/i.test(getAncestorText(element, 8)) ? -160 : 0;
+                const score = rect.top + rect.width * rect.height * 0.001 + exactBonus + modalBonus;
+                return {
+                    element,
+                    score
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.score - b.score);
+
+        return elements[0]?.element || null;
+    }
+
+    async function revealCoverFileInput() {
+        let input = findCoverFileInput();
+        if (input) {
+            return input;
+        }
+
+        const entryButton = findCoverEntryButton();
+        const targets = [
+            ...getCoverEntryClickTargets(getClickableOptionElement(entryButton)),
+            ...getVisibleCoverAreas()
+        ].filter((target, index, list) => {
+            return target && isVisible(target) && list.indexOf(target) === index;
+        });
+
+        for (const target of targets) {
+            clickElement(target);
+            input = await waitFor(findCoverFileInput, 700, 100);
+            if (input) {
+                return input;
+            }
+
+            const localUploadEntry = await waitFor(findLocalCoverUploadEntry, 900, 100);
+            if (localUploadEntry) {
+                clickElement(getClickableOptionElement(localUploadEntry));
+                input = await waitFor(findCoverFileInput, 1200, 100);
+                if (input) {
+                    return input;
+                }
+            }
+        }
+
+        return findCoverFileInput();
+    }
+
+    function getCoverUploadDebug() {
+        const fileInputs = Array.from(document.querySelectorAll('input[type="file"]'))
+            .slice(0, 8)
+            .map((input) => {
+                return `${getElementDescription(input)} accept="${input.getAttribute('accept') || ''}" score=${scoreCoverFileInput(input)}`;
+            });
+        const coverEntries = ['上传封面', '更换封面', '修改封面', '选择封面', '封面']
+            .flatMap((keyword) => getVisibleExactTextDescriptions(keyword, 3));
+        const coverHintElements = Array.from(document.querySelectorAll('[class*="cover"], [class*="Cover"], [id*="cover"], [id*="Cover"], img, canvas'))
+            .filter((element) => {
+                if (!isVisible(element)) {
+                    return false;
+                }
+
+                const attrs = normalizeText([
+                    element.className,
+                    element.id,
+                    element.getAttribute('alt'),
+                    element.getAttribute('src'),
+                    element.getAttribute('style')
+                ].filter(Boolean).join(' '));
+                return /cover|poster|thumbnail|thumb|pic|image|crop|blob:|封面/i.test(attrs);
+            })
+            .slice(0, 10)
+            .map(getElementDescription);
+
+        return [
+            `文件上传控件：${fileInputs.join(' | ') || '无'}`,
+            `封面入口文本：${coverEntries.join(' | ') || '无'}`,
+            `封面候选元素：${coverHintElements.join(' | ') || '无'}`
         ];
+    }
+
+    function getCoverMimeType(filename, fallbackType) {
+        const lowerName = String(filename || '').toLowerCase();
+        if (lowerName.endsWith('.png')) {
+            return 'image/png';
+        }
+        if (lowerName.endsWith('.webp')) {
+            return 'image/webp';
+        }
+        return fallbackType || 'image/jpeg';
+    }
+
+    async function createCoverFile(cover) {
+        const url = chrome.runtime.getURL(cover.path);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`无法读取封面资源：${cover.path}`);
+        }
+
+        const blob = await response.blob();
+        const filename = cover.filename || cover.path.split('/').pop() || 'cover.jpg';
+        return new File([blob], filename, {
+            type: getCoverMimeType(filename, blob.type)
+        });
+    }
+
+    function setFileInputFiles(input, file) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        input.files = dataTransfer.files;
+
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function findCoverConfirmButton() {
+        const confirmTexts = ['完成', '确定', '确认', '保存'];
+        const buttons = Array.from(document.querySelectorAll('button, div, span'))
+            .map((element) => {
+                if (!isVisible(element)) {
+                    return null;
+                }
+
+                const text = normalizeText(element.textContent);
+                if (!confirmTexts.includes(text)) {
+                    return null;
+                }
+
+                const context = getAncestorText(element, 8);
+                const rect = getElementRect(element);
+                const modalBonus = /裁剪|封面|预览|cover|crop/i.test(context) ? -200 : 0;
+                const bottomBonus = rect && rect.top > window.innerHeight * 0.35 ? -40 : 0;
+                const score = (rect ? rect.top : 0) + modalBonus + bottomBonus;
+
+                return {
+                    element,
+                    score
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.score - b.score);
+
+        return buttons[0]?.element || null;
+    }
+
+    async function confirmCoverCropIfNeeded() {
+        await delay(900);
+        const button = findCoverConfirmButton();
+        if (!button) {
+            return false;
+        }
+
+        clickElement(getClickableOptionElement(button));
+        await delay(450);
+        return true;
+    }
+
+    async function uploadCover(cover) {
+        if (!cover || !cover.path) {
+            return {
+                field: 'cover',
+                success: true,
+                message: '未配置封面，已跳过'
+            };
+        }
+
+        const input = await revealCoverFileInput();
+        if (!input) {
+            return {
+                field: 'cover',
+                success: false,
+                message: '未找到封面上传入口，请手动上传封面',
+                debug: getCoverUploadDebug()
+            };
+        }
+
+        try {
+            const file = await createCoverFile(cover);
+            setFileInputFiles(input, file);
+            const confirmed = await confirmCoverCropIfNeeded();
+
+            return {
+                field: 'cover',
+                success: true,
+                message: confirmed ? '已上传封面并确认裁剪' : '已上传封面，请检查是否需要手动确认裁剪'
+            };
+        } catch (error) {
+            return {
+                field: 'cover',
+                success: false,
+                message: error && error.message ? error.message : '封面上传失败，请手动上传'
+            };
+        }
+    }
+
+    async function fillUploadForm(payload) {
+        const results = [];
+        const emitProgress = (step, message, lineType = 'notice-line') => {
+            if (!payload?.runId || !chrome.runtime?.sendMessage) {
+                return;
+            }
+
+            chrome.runtime.sendMessage({
+                type: FILL_PROGRESS_MESSAGE_TYPE,
+                runId: payload.runId,
+                step,
+                message,
+                lineType
+            }, () => {
+                // Popup may close while the content script is still working.
+                void chrome.runtime.lastError;
+            });
+        };
+
+        const pushResult = (step, result) => {
+            results.push(result);
+            emitProgress(step, result.message, result.success ? 'success-line' : 'warning-line');
+        };
+
+        emitProgress('title', '正在填写标题...', 'notice-line');
+        pushResult('title', fillTitle(payload?.title));
 
         if (payload?.declaration) {
-            results.push(await selectFieldOption(
+            emitProgress('declaration', '正在选择创作声明...', 'notice-line');
+            pushResult('declaration', await selectFieldOption(
                 '创作声明',
                 payload.declaration,
                 'declaration',
@@ -1169,7 +1575,8 @@
         }
 
         if (payload?.category) {
-            results.push(await selectFieldOption(
+            emitProgress('category', '正在选择分区...', 'notice-line');
+            pushResult('category', await selectFieldOption(
                 '分区',
                 payload.category,
                 'category',
@@ -1178,7 +1585,13 @@
         }
 
         if (payload?.tags) {
-            results.push(await setTags(payload.tags));
+            emitProgress('tags', '正在设置标签...', 'notice-line');
+            pushResult('tags', await setTags(payload.tags));
+        }
+
+        if (payload?.cover) {
+            emitProgress('cover', '正在上传封面...', 'notice-line');
+            pushResult('cover', await uploadCover(payload.cover));
         }
 
         return {

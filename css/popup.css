@@ -23,6 +23,8 @@ body {
     font-size: 17px;
     font-weight: 600;
     margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f1f2;
     text-align: center;
 }
 

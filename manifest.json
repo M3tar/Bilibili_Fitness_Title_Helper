@@ -1,10 +1,16 @@
 {
   "manifest_version": 3,
   "name": "B站健身视频标题生成器",
-  "version": "1.6",
+  "version": "1.7",
   "description": "自动生成B站健身视频标题",
   "permissions": ["clipboardWrite", "tabs"],
   "host_permissions": ["https://member.bilibili.com/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["covers/*.jpg", "covers/*.png"],
+      "matches": ["https://member.bilibili.com/*"]
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
