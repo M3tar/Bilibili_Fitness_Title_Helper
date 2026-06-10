@@ -169,6 +169,15 @@
 - 打开封面设置，尝试走本地上传封面流程。
 - 向 popup 发送分步填写进度。
 
+创作声明选择适配：
+
+- 创作声明和分区都属于 B 站下拉选择，但 DOM 结构不同。
+- 分区下拉项通常会展开为可见、有坐标的选项，通用点击逻辑可以处理。
+- 创作声明使用 `bcc-select`，真实选项位于 `.bcc-select-list-wrap .bcc-select-option-list` 内的 `li.bcc-option`。
+- 该列表可能处于 `display: none`，导致 `li.bcc-option` 没有坐标，不能依赖普通鼠标坐标点击。
+- 插件会直接定位目标 `li.bcc-option`，触发 `pointerdown`、`mousedown`、`pointerup`、`mouseup`、`click` 和 `element.click()`，模拟组件真实选择事件。
+- 选择成功以 `li.bcc-option.selected` 或选择框展示区包含目标文案为准，避免只写 input value 造成“看起来选中但提交校验失败”。
+
 消息类型：
 
 ```js
@@ -244,6 +253,13 @@ B 站投稿页可能频繁调整 DOM，当前实现避免只依赖单一 CSS cla
 2. 在 label 附近查找 input、textarea、combobox、dropdown。
 3. 通过 placeholder、maxlength、当前值和上下文文本辅助判断。
 4. 最后使用具体 class 或可见文本作为兜底。
+
+创作声明特殊处理：
+
+- 不使用写入输入框值的方式设置 `内容无需标注`。
+- 不仅依据 `.bcc-select` 的整体 `textContent` 判断成功，因为该文本会包含所有候选项。
+- 优先查找 `.bcc-option`，并以 `.bcc-option.selected` 判断真实选中态。
+- 当选项没有坐标时，仍允许对隐藏的 `li.bcc-option` 派发点击事件。
 
 封面定位策略：
 
@@ -326,7 +342,7 @@ B 站投稿页可能频繁调整 DOM，当前实现避免只依赖单一 CSS cla
 - [x] 博主关键词推断
 - [x] 候选文本优先级排序和博主兜底识别
 - [x] 标题写入
-- [x] 创作声明：内容无需标注
+- [x] 创作声明：内容无需标注，并适配 `bcc-select` 隐藏选项的真实选中态
 - [x] 分区：健身
 - [x] 标签：减肥、健身、训练
 - [x] 清理非默认标签

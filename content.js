@@ -22,6 +22,14 @@
         return String(text || '').replace(/\s+/g, ' ').trim();
     }
 
+    function isDeclarationLabelText(text) {
+        const value = normalizeText(text).replace(/^\*\s*/, '');
+        return value.includes('创作') &&
+            value.includes('声明') &&
+            !value.includes('授权') &&
+            value.length <= 40;
+    }
+
     function addCandidate(candidates, text) {
         const normalized = normalizeText(text);
         if (!normalized || !DATE_PATTERN.test(normalized)) {
@@ -278,21 +286,34 @@
             .sort((a, b) => a.getBoundingClientRect().width - b.getBoundingClientRect().width)[0] || null;
     }
 
-    function getClickableOptionElement(element) {
+    function getClickableOptionElement(element, optionText = '') {
+        const expected = normalizeText(optionText);
         let current = element;
-        for (let i = 0; i < 4 && current; i++) {
+        for (let i = 0; i < 8 && current; i++) {
             const role = current.getAttribute('role');
             const tagName = current.tagName;
             const className = String(current.className || '').toLowerCase();
+            const text = normalizeText(current.textContent);
+            const rect = getElementRect(current);
+            const textMatches = !expected || text.includes(expected);
+            const sizeLooksLikeRow = rect && rect.width >= 120 && rect.height >= 28 && rect.height <= 96;
             if (
-                tagName === 'LI' ||
-                tagName === 'BUTTON' ||
-                role === 'option' ||
-                role === 'menuitem' ||
-                className.includes('option') ||
-                className.includes('select-option') ||
-                className.includes('dropdown-item') ||
-                className.includes('menu-item')
+                textMatches &&
+                (
+                    className.includes('bcc-option') ||
+                    tagName === 'LI' ||
+                    tagName === 'BUTTON' ||
+                    role === 'option' ||
+                    role === 'menuitem' ||
+                    current.hasAttribute('aria-selected') ||
+                    className.includes('option') ||
+                    className.includes('select-option') ||
+                    className.includes('select-item') ||
+                    className.includes('dropdown-item') ||
+                    className.includes('menu-item') ||
+                    className.includes('bcc-select-item') ||
+                    (sizeLooksLikeRow && className.includes('item'))
+                )
             ) {
                 return current;
             }
@@ -315,9 +336,60 @@
             })[0] || null;
     }
 
-    async function clickOptionElement(option) {
-        const clickableOption = getClickableOptionElement(option);
-        clickElement(clickableOption);
+    async function clickOptionElement(option, optionText = '') {
+        const clickableOption = getClickableOptionElement(option, optionText);
+        const rect = getElementRect(clickableOption) || getElementRect(option);
+
+        if (!rect) {
+            dispatchHiddenClick(clickableOption);
+            return;
+        }
+
+        const point = {
+            x: rect.left + Math.min(Math.max(rect.width / 2, 32), rect.width - 24),
+            y: rect.top + rect.height / 2
+        };
+
+        hoverElement(clickableOption);
+        await delay(40);
+        clickElementAt(clickableOption, point);
+    }
+
+    function dispatchHiddenClick(element) {
+        if (!element) {
+            return;
+        }
+
+        element.focus?.();
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((eventName) => {
+            const EventConstructor = eventName.startsWith('pointer') ? PointerEvent : MouseEvent;
+            element.dispatchEvent(new EventConstructor(eventName, {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 0,
+                buttons: eventName.endsWith('down') ? 1 : 0
+            }));
+        });
+        element.click?.();
+    }
+
+    function dispatchSelectionCommitEvents(control) {
+        if (!control) {
+            return;
+        }
+
+        const targets = [
+            control,
+            control.querySelector?.('input, textarea, [role="combobox"]')
+        ].filter(Boolean);
+
+        targets.forEach((target) => {
+            target.focus?.();
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+            target.dispatchEvent(new Event('blur', { bubbles: true }));
+        });
     }
 
     function getElementRect(element) {
@@ -362,6 +434,44 @@
         ].filter(Boolean).join(' '));
     }
 
+    function getSelectDisplayText(control) {
+        if (!control) {
+            return '';
+        }
+
+        const selectRoot = control.closest?.('.bcc-select, [role="combobox"], [aria-haspopup]') || control;
+        const targets = [
+            control,
+            selectRoot.querySelector?.('.bcc-select-input-wrap'),
+            selectRoot.querySelector?.('.bcc-select-selection-item'),
+            selectRoot.querySelector?.('.bcc-select-selector'),
+            selectRoot.querySelector?.('input')
+        ].filter(Boolean);
+
+        for (const target of targets) {
+            const value = normalizeText([
+                target.value,
+                target.textContent,
+                target.getAttribute?.('title'),
+                target.getAttribute?.('aria-label')
+            ].filter(Boolean).join(' '));
+
+            if (value) {
+                return value;
+            }
+        }
+
+        return '';
+    }
+
+    function isBccOptionSelected(control, optionText) {
+        const expected = normalizeText(optionText);
+        const selectRoot = getSelectRoot(control);
+        const options = Array.from(selectRoot?.querySelectorAll?.('.bcc-option.selected') || []);
+
+        return options.some((option) => normalizeText(option.textContent).includes(expected));
+    }
+
     function getElementDescription(element) {
         if (!element) {
             return '未找到元素';
@@ -392,12 +502,61 @@
     function getFieldDebug(labelText, optionText, control, option) {
         const openTargets = control ? getDropdownOpenTargets(control).slice(0, 5).map(getElementDescription) : [];
         const exactOptions = getVisibleExactTextDescriptions(optionText);
+        const selectDebug = labelText === '创作声明'
+            ? getSelectStructureDebug(control, optionText)
+            : [];
 
         return [
             `控件：${getElementDescription(control)}`,
             `选项：${getElementDescription(option)}`,
             `可点目标：${openTargets.join(' | ') || '无'}`,
-            `页面同名选项：${exactOptions.join(' | ') || '无'}`
+            `页面同名选项：${exactOptions.join(' | ') || '无'}`,
+            ...selectDebug
+        ];
+    }
+
+    function getElementStructureDescription(element) {
+        const rect = getElementRect(element);
+        const className = String(element.className || '').replace(/\s+/g, '.').slice(0, 80);
+        const role = element.getAttribute?.('role') || '';
+        const ariaSelected = element.getAttribute?.('aria-selected') || '';
+        const style = window.getComputedStyle(element);
+        const text = getControlText(element).slice(0, 80);
+        const rectText = rect
+            ? `${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.width)}x${Math.round(rect.height)}`
+            : '无坐标';
+
+        return `${element.tagName.toLowerCase()}${className ? '.' + className : ''} role="${role}" selected="${ariaSelected}" display="${style.display}" visibility="${style.visibility}" opacity="${style.opacity}" [${rectText}] "${text}"`;
+    }
+
+    function getSelectStructureDebug(control, optionText) {
+        if (!control) {
+            return [];
+        }
+
+        const expected = normalizeText(optionText);
+        const selectRoot = getSelectRoot(control);
+        const dropdownRoots = Array.from(document.querySelectorAll('.bcc-select-dropdown, .bcc-select-options, .bcc-select-menu, .bcc-dropdown, .bcc-popover, [role="listbox"], [role="menu"]'));
+        const roots = [selectRoot, ...dropdownRoots].filter(Boolean);
+        const candidates = roots
+            .flatMap((root) => Array.from(root.querySelectorAll?.('li, button, div, span, input, [role], [aria-selected]') || []))
+            .filter((element, index, list) => {
+                if (list.indexOf(element) !== index) {
+                    return false;
+                }
+
+                const text = getControlText(element);
+                const className = String(element.className || '').toLowerCase();
+                return text.includes(expected) ||
+                    /option|item|menu|dropdown|select|input/.test(className) ||
+                    element.hasAttribute?.('aria-selected') ||
+                    element.getAttribute?.('role');
+            })
+            .slice(0, 12)
+            .map(getElementStructureDescription);
+
+        return [
+            `声明select结构：${candidates.join(' | ') || '无'}`
         ];
     }
 
@@ -483,15 +642,32 @@
         const elements = Array.from(document.querySelectorAll('label, span, div, p'));
 
         return elements
-            .filter((element) => {
+            .map((element) => {
                 if (!isVisible(element)) {
-                    return false;
+                    return null;
                 }
 
                 const value = normalizeText(element.textContent).replace(/^\*\s*/, '');
-                return value === expected || value.startsWith(`${expected} `);
+                const isExact = value === expected;
+                const isPrefix = value.startsWith(`${expected} `);
+                const isDeclarationAlias = expected === '创作声明' && isDeclarationLabelText(value);
+                if (!isExact && !isPrefix && !isDeclarationAlias) {
+                    return null;
+                }
+
+                const declarationAliasScore = isDeclarationAlias
+                    ? (value.includes('性质') ? -4 : -2)
+                    : 0;
+                const exactScore = isExact ? -6 : 0;
+                const requiredScore = normalizeText(element.textContent).startsWith('*') ? -1 : 0;
+
+                return {
+                    element,
+                    score: exactScore + declarationAliasScore + requiredScore + value.length * 0.01
+                };
             })
-            .sort((a, b) => normalizeText(a.textContent).length - normalizeText(b.textContent).length)[0] || null;
+            .filter(Boolean)
+            .sort((a, b) => a.score - b.score)[0]?.element || null;
     }
 
     function getFieldContainer(labelText) {
@@ -639,6 +815,43 @@
         });
     }
 
+    async function selectDropdownFirstOptionByKeyboard(control, optionText) {
+        const target = getPrimaryDropdownTarget(control);
+        const input = target.querySelector?.('input') ||
+            control.querySelector?.('input') ||
+            getSelectRoot(control)?.querySelector?.('input') ||
+            target;
+        const rect = getElementRect(target);
+
+        const tryKeyboard = async () => {
+            input.focus?.();
+            await delay(80);
+            dispatchKeyboardSelect(input, 'ArrowDown', 'ArrowDown', 40);
+            await delay(180);
+            dispatchKeyboardSelect(input, 'Enter', 'Enter', 13);
+            await delay(260);
+            dispatchSelectionCommitEvents(control);
+            return getSelectDisplayText(control).includes(optionText) || isBccOptionSelected(control, optionText);
+        };
+
+        if (await tryKeyboard()) {
+            return true;
+        }
+
+        if (rect) {
+            clickPoint({
+                x: rect.left + Math.min(Math.max(rect.width / 2, 48), rect.width - 32),
+                y: rect.top + rect.height / 2
+            });
+            await delay(180);
+        } else {
+            clickElement(target);
+            await delay(180);
+        }
+
+        return tryKeyboard();
+    }
+
     function getPrimaryDropdownTarget(control) {
         return getDropdownOpenTargets(control).find((target) => {
             const className = String(target.className || '').toLowerCase();
@@ -646,61 +859,127 @@
         }) || control;
     }
 
+    function getSelectRoot(control) {
+        return control?.closest?.('.bcc-select, [role="combobox"], [aria-haspopup]') || control;
+    }
+
+    function findBccSelectOption(control, optionText) {
+        const expected = normalizeText(optionText);
+        const controlRect = getElementRect(control);
+        const selectRoot = getSelectRoot(control);
+        const roots = [
+            selectRoot,
+            ...Array.from(selectRoot?.querySelectorAll?.('.bcc-select-list-wrap, .bcc-select-option-list') || []),
+            ...Array.from(document.querySelectorAll('.bcc-select-dropdown, .bcc-select-options, .bcc-select-menu, .bcc-dropdown, .bcc-popover, [role="listbox"], [role="menu"]'))
+        ].filter(Boolean);
+
+        return roots
+            .flatMap((root) => Array.from(root.querySelectorAll?.('.bcc-option, .option-hover-tips, li, button, div, span, [role="option"], [aria-selected]') || []))
+            .map((element) => {
+                const value = normalizeText(element.textContent);
+                const className = String(element.className || '').toLowerCase();
+                const isBccOption = className.includes('bcc-option');
+                if (!isVisible(element) && !isBccOption) {
+                    return null;
+                }
+                if (!value.includes(expected) || (!isBccOption && value.length > 180)) {
+                    return null;
+                }
+
+                const textElement = value === expected || isBccOption
+                    ? element
+                    : findChildTextElement(element, expected);
+                if (!textElement) {
+                    return null;
+                }
+
+                const clickable = getClickableOptionElement(textElement, optionText);
+                const rect = getElementRect(clickable) || getElementRect(textElement);
+                if (!rect && !isBccOption) {
+                    return null;
+                }
+
+                if (controlRect && rect) {
+                    const isInsideControl = rect.top >= controlRect.top - 2 &&
+                        rect.bottom <= controlRect.bottom + 2 &&
+                        rect.left >= controlRect.left - 2 &&
+                        rect.right <= controlRect.right + 2;
+                    if (isInsideControl || rect.top < controlRect.bottom - 4) {
+                        return null;
+                    }
+                }
+
+                const classChain = getClassChain(clickable, 4);
+                const optionBonus = /bcc-option|option|item|menu|dropdown|select/.test(classChain) || clickable.hasAttribute('aria-selected') ? -300 : 0;
+                const yDistance = rect
+                    ? (controlRect ? Math.abs(rect.top - controlRect.bottom) : rect.top)
+                    : 0;
+
+                return {
+                    element: clickable,
+                    score: yDistance + optionBonus
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.score - b.score)[0]?.element || null;
+    }
+
     async function selectFirstDropdownOption(control) {
         const target = getPrimaryDropdownTarget(control);
         const rect = getElementRect(target);
 
         if (!rect) {
-            return;
+            return false;
         }
 
         clickElementAt(target, {
             x: rect.right - Math.min(24, rect.width / 2),
             y: rect.top + rect.height / 2
         });
-        await delay(220);
+        await delay(320);
 
-        clickPoint({
-            x: rect.left + 36,
-            y: rect.bottom + 24
-        });
-        await delay(220);
-    }
-
-    async function fillDeclarationInput(control, optionText) {
-        const target = getPrimaryDropdownTarget(control);
-        const input = target.querySelector?.('input') || control.querySelector?.('input') || control;
-
-        if (!input || !isVisible(input)) {
-            return false;
+        const option = findBccSelectOption(control, '内容无需标注');
+        if (option) {
+            await clickOptionElement(option, '内容无需标注');
+            await delay(220);
+            return true;
         }
 
-        clickElement(target);
-        await delay(120);
-        input.focus();
-        setNativeValue(input, optionText);
-        input.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            data: optionText,
-            inputType: 'insertText'
-        }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        await delay(120);
-        dispatchKeyboardSelect(input, 'Enter', 'Enter', 13);
-        await delay(220);
+        const x = rect.left + Math.min(Math.max(rect.width / 2, 48), rect.width - 32);
+        const yOffsets = [44, 56, 68];
 
-        return getControlText(input).includes(optionText) || getControlText(control).includes(optionText);
+        for (const offset of yOffsets) {
+            clickPoint({
+                x,
+                y: rect.bottom + offset
+            });
+            await delay(220);
+
+            if (getSelectDisplayText(control).includes('内容无需标注') || isBccOptionSelected(control, '内容无需标注')) {
+                return true;
+            }
+
+            clickElementAt(target, {
+                x: rect.right - Math.min(24, rect.width / 2),
+                y: rect.top + rect.height / 2
+            });
+            await delay(180);
+        }
+
+        return getSelectDisplayText(control).includes('内容无需标注') || isBccOptionSelected(control, '内容无需标注');
     }
 
     async function openDropdownAndFindOption(control, optionText, field) {
         const findOption = () => {
-            return findDropdownOption(optionText, control, field) ||
+            return (field === 'declaration' ? findBccSelectOption(control, optionText) : null) ||
+                findDropdownOption(optionText, control, field) ||
                 (field === 'declaration' ? findOptionNearControl(optionText, control) : null);
         };
-        const initialOption = findOption();
-        if (initialOption) {
-            return initialOption;
+        if (field !== 'declaration') {
+            const initialOption = findOption();
+            if (initialOption) {
+                return initialOption;
+            }
         }
 
         for (const target of getDropdownOpenTargets(control)) {
@@ -714,7 +993,7 @@
                 clickElement(target);
             }
 
-            const option = await waitFor(findOption, 650);
+            const option = await waitFor(findOption, field === 'declaration' ? 1200 : 650);
             if (option) {
                 return option;
             }
@@ -766,6 +1045,16 @@
 
                 const rect = getElementRect(element);
                 if (!rect) {
+                    return null;
+                }
+                const isInsideControl = rect.top >= controlRect.top - 2 &&
+                    rect.bottom <= controlRect.bottom + 2 &&
+                    rect.left >= controlRect.left - 2 &&
+                    rect.right <= controlRect.right + 2;
+                if (isInsideControl) {
+                    return null;
+                }
+                if (rect.top < controlRect.bottom - 4) {
                     return null;
                 }
                 if (rect.top < controlRect.top - 20 || rect.top - controlRect.bottom > 360) {
@@ -831,6 +1120,14 @@
                     return null;
                 }
                 if ((field === 'category' || field === 'declaration') && controlRect) {
+                    const isInsideControl = rect.top >= controlRect.top - 2 &&
+                        rect.bottom <= controlRect.bottom + 2 &&
+                        rect.left >= controlRect.left - 2 &&
+                        rect.right <= controlRect.right + 2;
+                    if (isInsideControl) {
+                        return null;
+                    }
+
                     const horizontalLimit = Math.max(controlRect.width, 260);
                     const optionCenterX = rect.left + rect.width / 2;
                     if (Math.abs(optionCenterX - controlCenterX) > horizontalLimit) {
@@ -899,14 +1196,6 @@
         }
 
         let control = findClickableControl(container, labelText);
-        if (getControlText(control).includes(optionText)) {
-            return {
-                field,
-                success: true,
-                message: successMessage
-            };
-        }
-
         if (!control) {
             return {
                 field,
@@ -915,22 +1204,26 @@
             };
         }
 
+        const alreadyShowsOption = field === 'declaration'
+            ? getSelectDisplayText(control).includes(optionText)
+            : getControlText(control).includes(optionText);
+        if (alreadyShowsOption && field !== 'declaration') {
+            return {
+                field,
+                success: true,
+                message: successMessage
+            };
+        }
+
         const option = await openDropdownAndFindOption(control, optionText, field);
         if (!option) {
             if (field === 'declaration' && optionText === '内容无需标注') {
-                await selectFirstDropdownOption(control);
+                const selectedByKeyboard = await selectDropdownFirstOptionByKeyboard(control, optionText);
+                const selectedFirstOption = selectedByKeyboard || await selectFirstDropdownOption(control);
+                dispatchSelectionCommitEvents(control);
 
                 const fallbackControl = findClickableControl(getFieldContainer(labelText) || container, labelText) || control;
-                if (getControlText(fallbackControl).includes(optionText)) {
-                    return {
-                        field,
-                        success: true,
-                        message: successMessage
-                    };
-                }
-
-                const inputFallbackSuccess = await fillDeclarationInput(fallbackControl, optionText);
-                if (inputFallbackSuccess) {
+                if (selectedByKeyboard || selectedFirstOption || getSelectDisplayText(fallbackControl).includes(optionText) || isBccOptionSelected(fallbackControl, optionText)) {
                     return {
                         field,
                         success: true,
@@ -954,12 +1247,21 @@
             };
         }
 
-        await clickOptionElement(option);
+        await clickOptionElement(option, optionText);
         await delay(250);
+        if (field === 'declaration') {
+            dispatchSelectionCommitEvents(control);
+            await delay(120);
+        }
 
         const nextContainer = getFieldContainer(labelText) || container;
         const nextControl = findClickableControl(nextContainer, labelText) || control;
-        if (!getControlText(nextControl).includes(optionText)) {
+        const confirmedText = field === 'declaration'
+            ? getSelectDisplayText(nextControl)
+            : getControlText(nextControl);
+        const isConfirmed = confirmedText.includes(optionText) ||
+            (field === 'declaration' && isBccOptionSelected(nextControl, optionText));
+        if (!isConfirmed) {
             return {
                 field,
                 success: false,
@@ -1557,7 +1859,12 @@
         };
 
         const pushResult = (step, result) => {
-            results.push(result);
+            const existingIndex = results.findIndex((item) => item.field === result.field);
+            if (existingIndex >= 0) {
+                results[existingIndex] = result;
+            } else {
+                results.push(result);
+            }
             emitProgress(step, result.message, result.success ? 'success-line' : 'warning-line');
         };
 
