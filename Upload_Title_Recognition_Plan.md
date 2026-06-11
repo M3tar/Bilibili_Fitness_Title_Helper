@@ -36,6 +36,7 @@
 | 祖嘉泽 | `covers/zu-jiaze.jpg` |
 | 陈玉轩 | `covers/chen-yuxuan.jpg` |
 | 张峰 | `covers/zhang-feng.png` |
+| 张峰古法健身 | `covers/zhang-feng-gufa.png` |
 
 ## 支持的输入格式
 
@@ -65,6 +66,7 @@
 | 张峰 | 张峰 |
 | 夜猫子专属 | 张峰 |
 | 减脂增肌操 | 张峰 |
+| 古法健身 | 张峰 |
 
 识别策略：
 
@@ -173,6 +175,7 @@
 
 - 创作声明和分区都属于 B 站下拉选择，但 DOM 结构不同。
 - 分区下拉项通常会展开为可见、有坐标的选项，通用点击逻辑可以处理。
+- 创作声明字段优先通过 label 定位；如果页面结构中 label 不稳定，则通过 `.statement-content` 或包含“请选择符合您视频内容的创作声明”的 `bcc-select` 兜底定位。
 - 创作声明使用 `bcc-select`，真实选项位于 `.bcc-select-list-wrap .bcc-select-option-list` 内的 `li.bcc-option`。
 - 该列表可能处于 `display: none`，导致 `li.bcc-option` 没有坐标，不能依赖普通鼠标坐标点击。
 - 插件会直接定位目标 `li.bcc-option`，触发 `pointerdown`、`mousedown`、`pointerup`、`mouseup`、`click` 和 `element.click()`，模拟组件真实选择事件。
@@ -256,6 +259,7 @@ B 站投稿页可能频繁调整 DOM，当前实现避免只依赖单一 CSS cla
 
 创作声明特殊处理：
 
+- 如果找不到 label 对应字段块，会扫描 `.statement-content` 和 `.bcc-select`，通过 placeholder 或选项文案确认是否为创作声明控件。
 - 不使用写入输入框值的方式设置 `内容无需标注`。
 - 不仅依据 `.bcc-select` 的整体 `textContent` 判断成功，因为该文本会包含所有候选项。
 - 优先查找 `.bcc-option`，并以 `.bcc-option.selected` 判断真实选中态。
@@ -303,6 +307,13 @@ B 站投稿页可能频繁调整 DOM，当前实现避免只依赖单一 CSS cla
 - 日期变为 `2026-06-03 周三`。
 - 博主自动切换为 `张峰`。
 - 标题预览刷新为张峰标题。
+
+### 张峰古法健身适配
+
+- 当博主为 `张峰` 且日期为周二时，类型选择显示 `古法健身`、`手臂训练`，默认选中 `古法健身`。
+- 当博主为 `张峰` 且日期为周四时，类型选择显示 `古法健身`、`核心肌力`，默认选中 `古法健身`。
+- 当周二或周四选择 `古法健身` 时，标题使用 `「日期｜古法健身」张峰-Give Me Five 直播回放录屏完整版`。
+- 当周二或周四选择 `古法健身` 时，封面使用 `covers/zhang-feng-gufa.png`。
 
 ### 填写成功路径
 

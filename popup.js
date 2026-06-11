@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const trainerButtonsContainer = document.getElementById('trainerButtons');
     let trainerButtons = [];
     const showChenToggle = document.getElementById('showChenToggle');
-    const aerobicButtons = document.querySelectorAll('.aerobic-button');
+    let aerobicButtons = [];
     const timeButtons = document.querySelectorAll('.time-button');
     const timeGroup = document.getElementById('timeGroup');
     const aerobicGroup = document.getElementById('aerobicGroup');
@@ -57,6 +57,15 @@ document.addEventListener('DOMContentLoaded', function() {
             path: 'covers/zhang-feng.png',
             filename: 'zhang-feng.png'
         }
+    };
+    const ZHANG_GUFA_COVER_CONFIG = {
+        path: 'covers/zhang-feng-gufa.png',
+        filename: 'zhang-feng-gufa.png'
+    };
+    const ZHANG_TRAINING_OPTIONS_BY_DAY = {
+        2: ['古法健身', '手臂训练'],
+        4: ['古法健身', '核心肌力'],
+        5: ['手臂核心', '有氧双冠', '沉浸有氧']
     };
 
     function setTitleSource(source, detail) {
@@ -160,10 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (trainer === '张峰') {
-            let trainingType = getTrainingType(trainer, weekDay);
-            if (weekDay === 5) {
-                trainingType = selectedAerobic;
-            }
+            const trainingType = getSelectedZhangTrainingType(weekDay);
             return `「${dateStr}｜${trainingType}」张峰-Give Me Five 直播回放录屏完整版`;
         }
 
@@ -354,18 +360,44 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 添加有氧类型选择事件监听
-    aerobicButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            // 移除其他按钮的激活状态
-            aerobicButtons.forEach(btn => btn.classList.remove('active'));
-            // 激活当前按钮
-            this.classList.add('active');
-            selectedAerobic = this.dataset.aerobic;
-            markManualAdjustment('已手动调整类型，将按当前选择填写');
-            refreshPreview();
+    function bindTrainingOptionButtonEvents() {
+        aerobicButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                aerobicButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                selectedAerobic = this.dataset.aerobic;
+                markManualAdjustment('已手动调整类型，将按当前选择填写');
+                refreshPreview();
+            });
         });
-    });
+    }
+
+    function renderTrainingOptionButtons(options) {
+        if (!aerobicGroup) {
+            return;
+        }
+
+        const container = aerobicGroup.querySelector('.aerobic-buttons');
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = '';
+        options.forEach((option) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'aerobic-button';
+            button.dataset.aerobic = option;
+            button.textContent = option;
+            if (option === selectedAerobic) {
+                button.classList.add('active');
+            }
+            container.appendChild(button);
+        });
+
+        aerobicButtons = container.querySelectorAll('.aerobic-button');
+        bindTrainingOptionButtonEvents();
+    }
 
     // 添加时间段选择事件监听
     timeButtons.forEach(button => {
@@ -382,7 +414,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 更新有氧选择组的显示状态
     function updateAerobicGroup() {
-        if (selectedTrainer === '张峰' && selectedDate && selectedDate.getDay() === 5) {
+        const options = getZhangTrainingOptions(selectedDate?.getDay());
+        if (selectedTrainer === '张峰' && options.length > 0) {
+            if (!options.includes(selectedAerobic)) {
+                selectedAerobic = options[0];
+            }
+            renderTrainingOptionButtons(options);
             aerobicGroup.classList.remove('hidden');
         } else {
             aerobicGroup.classList.add('hidden');
@@ -622,7 +659,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return '祖嘉泽';
         }
 
-        if (value.includes('张峰') || value.includes('夜猫子专属') || value.includes('减脂增肌操')) {
+        if (
+            value.includes('张峰') ||
+            value.includes('夜猫子专属') ||
+            value.includes('减脂增肌操') ||
+            value.includes('古法健身')
+        ) {
             return '张峰';
         }
 
@@ -647,7 +689,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (sourceText.includes('.mp4') || sourceText.includes('上传中') || sourceText.includes('已上传')) {
                     score += 800;
                 }
-                if (sourceText.includes('跟练') || sourceText.includes('夜猫子') || sourceText.includes('减脂')) {
+                if (sourceText.includes('跟练') || sourceText.includes('夜猫子') || sourceText.includes('减脂') || sourceText.includes('古法')) {
                     score += 500;
                 }
 
@@ -716,14 +758,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (selectedTrainer === '张峰') {
-            if (weekDay === 5) {
-                return {
-                    text: `周五类型：${selectedAerobic}`,
-                    type: 'notice-line'
-                };
-            }
-
-            const trainingType = getTrainingType(selectedTrainer, weekDay);
+            const trainingType = getSelectedZhangTrainingType(weekDay);
             return {
                 text: trainingType ? `训练类型：${trainingType}` : '训练类型：未配置',
                 type: 'notice-line'
@@ -1029,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', function() {
             requestFillUploadForm(tabResult.tab.id, {
                 runId: activeFillRunId,
                 title,
-                cover: COVER_CONFIG_BY_TRAINER[selectedTrainer] || null,
+                cover: getCoverConfig(),
                 ...DEFAULT_FILL_CONFIG
             }, (response) => {
                 fillBtn.disabled = false;
@@ -1068,6 +1103,32 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
         return trainingMaps[trainer]?.[weekDay] || '';
+    }
+
+    function getZhangTrainingOptions(weekDay) {
+        return ZHANG_TRAINING_OPTIONS_BY_DAY[weekDay] || [];
+    }
+
+    function getSelectedZhangTrainingType(weekDay) {
+        const options = getZhangTrainingOptions(weekDay);
+        if (options.length > 0) {
+            return options.includes(selectedAerobic) ? selectedAerobic : options[0];
+        }
+
+        return getTrainingType('张峰', weekDay);
+    }
+
+    function getCoverConfig() {
+        if (
+            selectedTrainer === '张峰' &&
+            selectedDate &&
+            [2, 4].includes(selectedDate.getDay()) &&
+            getSelectedZhangTrainingType(selectedDate.getDay()) === '古法健身'
+        ) {
+            return ZHANG_GUFA_COVER_CONFIG;
+        }
+
+        return COVER_CONFIG_BY_TRAINER[selectedTrainer] || null;
     }
 
     // 复制标题

@@ -670,8 +670,43 @@
             .sort((a, b) => a.score - b.score)[0]?.element || null;
     }
 
+    function findDeclarationFieldContainer() {
+        const containers = Array.from(document.querySelectorAll('.statement-content, .bcc-select'))
+            .map((element) => {
+                const select = element.matches?.('.bcc-select')
+                    ? element
+                    : element.querySelector?.('.bcc-select');
+                if (!select || !isVisible(select)) {
+                    return null;
+                }
+
+                const input = select.querySelector('input');
+                const placeholder = normalizeText(input?.getAttribute('placeholder'));
+                const text = normalizeText(select.textContent);
+                const isDeclarationSelect = placeholder.includes('创作声明') ||
+                    placeholder.includes('视频内容') ||
+                    text.includes('内容无需标注') ||
+                    text.includes('含AI生成内容') ||
+                    text.includes('内容授权声明');
+                if (!isDeclarationSelect) {
+                    return null;
+                }
+
+                return element.matches?.('.statement-content')
+                    ? element
+                    : (element.closest?.('.statement-content') || element);
+            })
+            .filter(Boolean);
+
+        return containers[0] || null;
+    }
+
     function getFieldContainer(labelText) {
         const label = findLabelElement(labelText);
+        if (!label && labelText === '创作声明') {
+            return findDeclarationFieldContainer();
+        }
+
         let current = label;
 
         for (let i = 0; i < 5 && current; i++) {
@@ -683,7 +718,7 @@
             current = current.parentElement;
         }
 
-        return label ? label.parentElement : null;
+        return label ? label.parentElement : (labelText === '创作声明' ? findDeclarationFieldContainer() : null);
     }
 
     function findClickableControl(container, labelText) {

@@ -707,7 +707,7 @@ button:disabled {
     border-color: #00b5e5;
 }
 
-/* 有氧类型选择按钮样式 */
+/* 类型选择按钮样式 */
 .aerobic-buttons {
     display: flex;
     gap: 8px;
